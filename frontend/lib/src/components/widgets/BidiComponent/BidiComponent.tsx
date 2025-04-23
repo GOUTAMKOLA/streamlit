@@ -26,24 +26,18 @@ export type BidiComponentProps = {
   element: BidiComponentProto
 }
 
-const BidiComponent: FC<BidiComponentProps> = ({ element }) => {
-  const { id, jsContent, htmlContent, cssContent, isolateStyles } = element
+interface UseShadowDomResult {
+  containerRef: React.RefObject<HTMLDivElement>
+  shadowRootRef: React.RefObject<ShadowRoot | null>
+}
 
-  const componentId = useId()
-
+const useShadowDom = (
+  id: string,
+  isolateStyles: boolean
+): UseShadowDomResult => {
   const containerRef = useRef<HTMLDivElement>(null)
   const shadowRootRef = useRef<ShadowRoot | null>(null)
-  const contentContainerRef = useRef<HTMLDivElement | null>(null)
 
-  const userHtmlContent = useMemo(() => {
-    return htmlContent.trim()
-  }, [htmlContent])
-
-  const userCssContent = useMemo(() => {
-    return cssContent.trim()
-  }, [cssContent])
-
-  // Setup shadow DOM if needed
   useEffect(() => {
     if (!containerRef.current) {
       return
@@ -64,7 +58,24 @@ const BidiComponent: FC<BidiComponentProps> = ({ element }) => {
     }
   }, [id, isolateStyles])
 
-  // Handle HTML and CSS content
+  return { containerRef, shadowRootRef }
+}
+
+const useHtmlCssContent = ({
+  isolateStyles,
+  html,
+  css,
+  containerRef,
+  shadowRootRef,
+}: {
+  isolateStyles: boolean
+  html: string
+  css: string
+  containerRef: React.RefObject<HTMLDivElement>
+  shadowRootRef: React.RefObject<ShadowRoot | null>
+}): void => {
+  const contentContainerRef = useRef<HTMLDivElement | null>(null)
+
   useEffect(() => {
     if (!containerRef.current) {
       return
@@ -85,28 +96,43 @@ const BidiComponent: FC<BidiComponentProps> = ({ element }) => {
     }
 
     // Create content container if needed
-    if (userHtmlContent || userCssContent) {
+    if (html || css) {
       contentContainerRef.current = document.createElement("div")
 
       // Add HTML content if available
-      if (userHtmlContent) {
+      if (html) {
         const htmlDiv = document.createElement("div")
-        htmlDiv.innerHTML = userHtmlContent
+        htmlDiv.innerHTML = html
         contentContainerRef.current.appendChild(htmlDiv)
       }
 
       // Add CSS content if available
-      if (userCssContent) {
+      if (css) {
         const styleElement = document.createElement("style")
-        styleElement.textContent = userCssContent
+        styleElement.textContent = css
         contentContainerRef.current.appendChild(styleElement)
       }
 
       parent.appendChild(contentContainerRef.current)
     }
-  }, [isolateStyles, userHtmlContent, userCssContent])
+  }, [isolateStyles, html, css, containerRef, shadowRootRef])
+}
 
-  // Handle JavaScript content
+const useJavaScriptContent = ({
+  id,
+  jsContent,
+  isolateStyles,
+  componentId,
+  containerRef,
+  shadowRootRef,
+}: {
+  id: string
+  jsContent: string
+  isolateStyles: boolean
+  componentId: string
+  containerRef: React.RefObject<HTMLDivElement>
+  shadowRootRef: React.RefObject<ShadowRoot | null>
+}): void => {
   useEffect(() => {
     if (!jsContent) {
       LOG.error("BidiComponent Error: No JavaScript content provided.")
@@ -182,20 +208,21 @@ const BidiComponent: FC<BidiComponentProps> = ({ element }) => {
 
     handleImport()
 
-    // Return cleanup function to remove event handlers
     return () => {
       // Set mounted state to false first
       isMounted = false
 
-      if (cleanup) {
-        try {
-          cleanup()
-        } catch (error) {
-          LOG.error(
-            `BidiComponent Error: Failed to run cleanup for element ${id}`,
-            error
-          )
-        }
+      if (!cleanup) {
+        return
+      }
+
+      try {
+        cleanup()
+      } catch (error) {
+        LOG.error(
+          `BidiComponent Error: Failed to run cleanup for element ${id}`,
+          error
+        )
       }
     }
 
@@ -204,6 +231,40 @@ const BidiComponent: FC<BidiComponentProps> = ({ element }) => {
     // eslint-disable-next-line react-compiler/react-compiler
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+}
+
+const useProcessBidiElement = (
+  element: BidiComponentProto
+): { html: string; css: string } => {
+  const { htmlContent, cssContent } = element
+
+  const userHtmlContent = useMemo(() => htmlContent.trim(), [htmlContent])
+
+  const userCssContent = useMemo(() => cssContent.trim(), [cssContent])
+
+  return {
+    html: userHtmlContent,
+    css: userCssContent,
+  }
+}
+
+const BidiComponent: FC<BidiComponentProps> = ({ element }) => {
+  const { id, jsContent, isolateStyles } = element
+
+  const { html, css } = useProcessBidiElement(element)
+  const { containerRef, shadowRootRef } = useShadowDom(id, isolateStyles)
+  const componentId = useId()
+
+  useHtmlCssContent({ isolateStyles, html, css, containerRef, shadowRootRef })
+
+  useJavaScriptContent({
+    id,
+    jsContent,
+    isolateStyles,
+    componentId,
+    containerRef,
+    shadowRootRef,
+  })
 
   return <div ref={containerRef} data-testid="stBidiComponent" />
 }
