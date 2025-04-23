@@ -104,7 +104,12 @@ class BidiComponentMixin:
     def bidi_component(
         self,
         *,  # Make following args keyword-only
-        js: str,
+        js: str | None = None,
+        html: str | None = None,
+        css: str | None = None,
+        isolate_styles: bool = False,
+        data: Any = None,
+        child_container_count: int = 0,
         key: str | None = None,
         default: Any = None,
         on_change: WidgetCallback | None = None,
@@ -113,8 +118,19 @@ class BidiComponentMixin:
 
         Parameters
         ----------
-        js : str
+        js : str or None
             The JavaScript code string for the component.
+        html : str or None
+            Optional HTML content to render in the component container.
+            This content is injected before the JavaScript executes.
+        css : str or None
+            Optional CSS content to apply to the component.
+        isolate_styles : bool
+            Whether to isolate styles from the parent. Default is False.
+        data : any or None
+            The JSON serializable data to pass to the component.
+        child_container_count : int
+            The number of child containers this component has. Default is 0.
         key : str or None
             An optional string to use as the unique key for the component.
             If this is omitted, a key will be generated based on the
@@ -147,13 +163,23 @@ class BidiComponentMixin:
             INTERNAL_COMPONENT_NAME,
             user_key=key,
             form_id=current_form_id(self.dg),
-            js_content=js,  # Always include js content in the ID hash
+            js_content=js,
+            html_content=html,
+            css_content=css,
+            child_container_count=child_container_count,
+            isolate_styles=isolate_styles,
             # Add other relevant args here if they affect identity and should cause a reset
         )
 
         bidi_component_proto = BidiComponentProto()
         bidi_component_proto.component_name = INTERNAL_COMPONENT_NAME
-        bidi_component_proto.js_content = js
+        # TODO: Update the args to be HTML, OR JS, OR both
+        bidi_component_proto.js_content = js or ""
+        bidi_component_proto.html_content = html or ""  # Set empty string if None
+        bidi_component_proto.css_content = css or ""  # Set empty string if None
+        bidi_component_proto.isolate_styles = isolate_styles
+        bidi_component_proto.data = json.dumps(data) if data is not None else ""
+        bidi_component_proto.child_container_count = child_container_count
         bidi_component_proto.form_id = current_form_id(self.dg)
         bidi_component_proto.id = computed_id
 

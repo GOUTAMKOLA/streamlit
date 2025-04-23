@@ -14,13 +14,32 @@
 
 import streamlit as st
 
-st.write("Bidi Component")
-
-JS_CODE = """
-export default function(component) {
+DEFAULT_JS_CODE = """export default function(component) {
   console.log("I am a bidi component", component)
   return 'Hello World'
 }
 """
 
-st.bidi_component(js=JS_CODE)
+DEFAULT_HTML_CODE = """<div>
+  <h1>Hello World</h1>
+</div>
+"""
+
+DEFAULT_CSS_CODE = """div {
+  color: red;
+}
+"""
+
+st.write("# Bidi Component Editor")
+
+# Create a form for editing the component code
+with st.form("bidi_editor"):
+    js_code = st.text_area("JavaScript Code", DEFAULT_JS_CODE, height=200)
+    html_code = st.text_area("HTML Code", DEFAULT_HTML_CODE, height=200)
+    css_code = st.text_area("CSS Code", DEFAULT_CSS_CODE, height=200)
+    isolate_styles = st.checkbox("Isolate Styles", value=True)
+    submit_button = st.form_submit_button("Update Component")
+
+st.bidi_component(
+    js=js_code, html=html_code, css=css_code, isolate_styles=isolate_styles
+)

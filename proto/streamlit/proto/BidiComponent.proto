@@ -21,7 +21,7 @@ option java_outer_classname = "BidiComponentProto";
 
 // Represents an instance of a bidirectional component.
 message BidiComponent {
-    // The ID of the widget instance. This is calculated by hashing component_name + key.
+    // The ID of the widget instance.
     string id = 1;
     // The registered name of the component.
     string component_name = 2;
@@ -29,4 +29,14 @@ message BidiComponent {
     string js_content = 3;
     // The ID of the form this component belongs to, if any.
     string form_id = 4;
+    // The HTML content provided by the developer.
+    string html_content = 5;
+    // The CSS content provided by the developer.
+    string css_content = 6;
+    // Whether to isolate styles from the parent.
+    bool isolate_styles = 7;
+    // The JSON value of the component's state.
+    string data = 8;
+    // The number of child containers this component has.
+    int32 child_container_count = 9;
 }

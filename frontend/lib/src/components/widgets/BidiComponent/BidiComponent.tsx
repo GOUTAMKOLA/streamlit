@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import React, { FC, memo, useEffect, useId, useRef } from "react"
+import React, { FC, memo, useEffect, useId, useMemo, useRef } from "react"
 
 import { getLogger } from "loglevel"
 
@@ -27,12 +27,86 @@ export type BidiComponentProps = {
 }
 
 const BidiComponent: FC<BidiComponentProps> = ({ element }) => {
-  const { id, jsContent } = element
+  const { id, jsContent, htmlContent, cssContent, isolateStyles } = element
 
   const componentId = useId()
 
   const containerRef = useRef<HTMLDivElement>(null)
+  const shadowRootRef = useRef<ShadowRoot | null>(null)
+  const contentContainerRef = useRef<HTMLDivElement | null>(null)
 
+  const userHtmlContent = useMemo(() => {
+    return htmlContent.trim()
+  }, [htmlContent])
+
+  const userCssContent = useMemo(() => {
+    return cssContent.trim()
+  }, [cssContent])
+
+  // Setup shadow DOM if needed
+  useEffect(() => {
+    if (!containerRef.current) {
+      return
+    }
+
+    const containerElement = containerRef.current
+
+    // Create shadow root if isolateStyles is true
+    if (isolateStyles && !shadowRootRef.current) {
+      try {
+        shadowRootRef.current = containerElement.attachShadow({ mode: "open" })
+      } catch (error) {
+        LOG.error(
+          `BidiComponent Error: Failed to create shadow DOM for element ${id}`,
+          error
+        )
+      }
+    }
+  }, [id, isolateStyles])
+
+  // Handle HTML and CSS content
+  useEffect(() => {
+    if (!containerRef.current) {
+      return
+    }
+
+    // Determine parent element (shadow root or container)
+    const parent =
+      isolateStyles && shadowRootRef.current
+        ? shadowRootRef.current
+        : containerRef.current
+
+    // Clean up previous content
+    if (
+      contentContainerRef.current &&
+      contentContainerRef.current.parentNode === parent
+    ) {
+      parent.removeChild(contentContainerRef.current)
+    }
+
+    // Create content container if needed
+    if (userHtmlContent || userCssContent) {
+      contentContainerRef.current = document.createElement("div")
+
+      // Add HTML content if available
+      if (userHtmlContent) {
+        const htmlDiv = document.createElement("div")
+        htmlDiv.innerHTML = userHtmlContent
+        contentContainerRef.current.appendChild(htmlDiv)
+      }
+
+      // Add CSS content if available
+      if (userCssContent) {
+        const styleElement = document.createElement("style")
+        styleElement.textContent = userCssContent
+        contentContainerRef.current.appendChild(styleElement)
+      }
+
+      parent.appendChild(contentContainerRef.current)
+    }
+  }, [isolateStyles, userHtmlContent, userCssContent])
+
+  // Handle JavaScript content
   useEffect(() => {
     if (!jsContent) {
       LOG.error("BidiComponent Error: No JavaScript content provided.")
@@ -48,21 +122,25 @@ const BidiComponent: FC<BidiComponentProps> = ({ element }) => {
     const dataUri = `data:text/javascript;charset=utf-8,${encodeURIComponent(
       jsContent
     )}`
-    const containerElement = containerRef.current
 
     const handleImport = async (): Promise<void> => {
       try {
         // Dynamically import the module from the data URI
         const module = await import(/* @vite-ignore */ dataUri)
         if (module.default && typeof module.default === "function") {
-          // Call the default exported function, passing the container element
+          // Determine parent element (shadow root or container)
+          const parentElement =
+            isolateStyles && shadowRootRef.current
+              ? shadowRootRef.current
+              : containerRef.current
+
           module.default({
             // TODO: Add a name
             name: "",
             // TODO: Add data
             data: null,
             key: componentId,
-            parentElement: containerElement,
+            parentElement,
             // TODO: Add child container IDs
             childContainerIDs: [],
           })
@@ -82,11 +160,6 @@ const BidiComponent: FC<BidiComponentProps> = ({ element }) => {
 
     handleImport()
 
-    return () => {
-      if (containerElement) {
-        containerElement.innerHTML = ""
-      }
-    }
     // NOTE: Intentionally only running on mount in order to achieve the product behavior of
     // not allowing `jsContent` to be updated after the component is mounted.
     // eslint-disable-next-line react-compiler/react-compiler
