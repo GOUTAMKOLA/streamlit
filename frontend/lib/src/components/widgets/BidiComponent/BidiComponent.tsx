@@ -205,9 +205,7 @@ const BidiComponent: FC<BidiComponentProps> = ({ element }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  return (
-    <div ref={containerRef} data-testid={`stBidiComponent-${element.id}`} />
-  )
+  return <div ref={containerRef} data-testid="stBidiComponent" />
 }
 
 export default memo(BidiComponent)
