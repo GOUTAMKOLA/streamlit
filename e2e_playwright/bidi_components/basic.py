@@ -16,12 +16,33 @@ import streamlit as st
 
 DEFAULT_JS_CODE = """export default function(component) {
   console.log("I am a bidi component", component)
-  return 'Hello World'
+
+  const { parentElement } = component
+
+  const form = parentElement.querySelector("form")
+  const handleSubmit = (event) => {
+    event.preventDefault()
+    console.log("Form submitted")
+  }
+
+  form.addEventListener("submit", handleSubmit)
+
+  return () => {
+    console.log("Cleaning up")
+    form.removeEventListener("submit", handleSubmit)
+  }
 }
 """
 
 DEFAULT_HTML_CODE = """<div>
   <h1>Hello World</h1>
+  <form>
+    <label for="range">Range</label>
+    <input type="range" id="range" min="0" max="100" value="50" />
+    <label for="text">Text</label>
+    <input type="text" id="text" value="Text input" />
+    <button type="submit">Submit form</button>
+  </form>
 </div>
 """
 
@@ -41,5 +62,8 @@ with st.form("bidi_editor"):
     submit_button = st.form_submit_button("Update Component")
 
 st.bidi_component(
-    js=js_code, html=html_code, css=css_code, isolate_styles=isolate_styles
+    js=js_code,
+    html=html_code,
+    css=css_code,
+    isolate_styles=isolate_styles,
 )

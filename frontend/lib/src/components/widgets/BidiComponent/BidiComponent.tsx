@@ -118,15 +118,29 @@ const BidiComponent: FC<BidiComponentProps> = ({ element }) => {
       return
     }
 
+    // Track mounted state to prevent race conditions
+    let isMounted = true
+
     // Construct a data URI for the JavaScript content
     const dataUri = `data:text/javascript;charset=utf-8,${encodeURIComponent(
       jsContent
     )}`
 
+    // Store cleanup function from module if provided
+    // NOTE: This is a modification from the spec to allow for a cleanup function
+    // to be returned from the module.
+    let cleanup: (() => void) | undefined
+
     const handleImport = async (): Promise<void> => {
       try {
         // Dynamically import the module from the data URI
         const module = await import(/* @vite-ignore */ dataUri)
+
+        // Check if component is still mounted before continuing
+        if (!isMounted) {
+          return
+        }
+
         if (module.default && typeof module.default === "function") {
           // Determine parent element (shadow root or container)
           const parentElement =
@@ -134,7 +148,7 @@ const BidiComponent: FC<BidiComponentProps> = ({ element }) => {
               ? shadowRootRef.current
               : containerRef.current
 
-          module.default({
+          const result = module.default({
             // TODO: Add a name
             name: "",
             // TODO: Add data
@@ -144,6 +158,11 @@ const BidiComponent: FC<BidiComponentProps> = ({ element }) => {
             // TODO: Add child container IDs
             childContainerIDs: [],
           })
+
+          // If the module returns a cleanup function, store it
+          if (typeof result === "function") {
+            cleanup = result
+          }
         } else {
           LOG.error(
             "BidiComponent Error: Module does not have a default export function.",
@@ -151,14 +170,34 @@ const BidiComponent: FC<BidiComponentProps> = ({ element }) => {
           )
         }
       } catch (error) {
-        LOG.error(
-          `BidiComponent Error: Failed to load or execute script for element ${id}`,
-          error
-        )
+        // Check if component is still mounted before logging errors
+        if (isMounted) {
+          LOG.error(
+            `BidiComponent Error: Failed to load or execute script for element ${id}`,
+            error
+          )
+        }
       }
     }
 
     handleImport()
+
+    // Return cleanup function to remove event handlers
+    return () => {
+      // Set mounted state to false first
+      isMounted = false
+
+      if (cleanup) {
+        try {
+          cleanup()
+        } catch (error) {
+          LOG.error(
+            `BidiComponent Error: Failed to run cleanup for element ${id}`,
+            error
+          )
+        }
+      }
+    }
 
     // NOTE: Intentionally only running on mount in order to achieve the product behavior of
     // not allowing `jsContent` to be updated after the component is mounted.
