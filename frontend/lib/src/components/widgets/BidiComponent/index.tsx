@@ -1,4 +1,4 @@
-/**!
+/**
  * Copyright (c) Streamlit Inc. (2018-2022) Snowflake Inc. (2022-2025)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,19 +14,4 @@
  * limitations under the License.
  */
 
-syntax = "proto3";
-
-option java_package = "com.snowflake.apps.streamlit";
-option java_outer_classname = "BidiComponentProto";
-
-// Represents an instance of a bidirectional component.
-message BidiComponent {
-    // The ID of the widget instance. This is calculated by hashing component_name + key.
-    string id = 1;
-    // The registered name of the component.
-    string component_name = 2;
-    // The JavaScript content provided by the developer.
-    string js_content = 3;
-    // The ID of the form this component belongs to, if any.
-    string form_id = 4;
-}
+export { default } from "./BidiComponent"
