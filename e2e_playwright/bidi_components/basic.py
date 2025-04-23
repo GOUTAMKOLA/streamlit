@@ -22,7 +22,10 @@ DEFAULT_JS_CODE = """export default function(component) {
   const form = parentElement.querySelector("form")
   const handleSubmit = (event) => {
     event.preventDefault()
-    console.log("Form submitted")
+    console.log("Form submitted with values", {
+      range: event.target.range.value,
+      text: event.target.text.value,
+    })
   }
 
   form.addEventListener("submit", handleSubmit)
