@@ -17,8 +17,8 @@ import streamlit as st
 st.write("Bidi Component")
 
 JS_CODE = """
-export default function() {
-  console.log("I am a bidi component")
+export default function(component) {
+  console.log("I am a bidi component", component)
   return 'Hello World'
 }
 """
