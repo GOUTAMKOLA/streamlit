@@ -31,16 +31,18 @@ const useHandleHtmlAndCssContent = ({
   html,
   cssContent,
   isShadowRoot,
+  skip = false,
 }: {
   containerRef: React.RefObject<HTMLDivElement>
   html: string
   cssContent: string
   isShadowRoot: boolean
+  skip?: boolean
 }): React.MutableRefObject<HTMLDivElement | null> => {
   const contentRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
-    if (!containerRef.current) {
+    if (skip || !containerRef.current) {
       return
     }
 
@@ -75,7 +77,7 @@ const useHandleHtmlAndCssContent = ({
     }
 
     parent.appendChild(contentRef.current)
-  }, [html, cssContent, containerRef, isShadowRoot])
+  }, [html, cssContent, containerRef, isShadowRoot, skip])
 
   return contentRef
 }
@@ -84,15 +86,17 @@ const useHandleJsContent = ({
   jsContent,
   id,
   parentRef,
+  skip = false,
 }: {
   jsContent: string
   id: string
   parentRef: React.RefObject<HTMLDivElement | ShadowRoot | null>
+  skip?: boolean
 }): void => {
   const componentId = useId()
 
   useEffect(() => {
-    if (!jsContent || !parentRef.current) {
+    if (skip || !jsContent || !parentRef.current) {
       return
     }
 
@@ -168,6 +172,7 @@ const IsolatedComponent: FC<{
 }> = ({ id, jsContent, htmlContent: html, cssContent }) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const shadowRootRef = useRef<ShadowRoot | null>(null)
+  const [isShadowRootReady, setIsShadowRootReady] = React.useState(false)
 
   useEffect(() => {
     if (!containerRef.current) {
@@ -178,6 +183,7 @@ const IsolatedComponent: FC<{
       shadowRootRef.current = containerRef.current.attachShadow({
         mode: "open",
       })
+      setIsShadowRootReady(true)
     } catch (error) {
       LOG.error(
         `BidiComponent Error: Failed to create shadow DOM for element ${id}`,
@@ -191,12 +197,14 @@ const IsolatedComponent: FC<{
     html,
     cssContent,
     isShadowRoot: true,
+    skip: !isShadowRootReady,
   })
 
   useHandleJsContent({
     jsContent,
     id,
     parentRef: shadowRootRef,
+    skip: !isShadowRootReady,
   })
 
   return <div ref={containerRef} data-testid="stBidiComponent-isolated" />
