@@ -102,12 +102,15 @@ class BidiComponentDefinition:
         CSS content as a string, or a path to a CSS file.
     js : str, Path, or None
         JavaScript content as a string, or a path to a JS file.
+    isolate_styles : bool
+        Whether to isolate styles for the component.
     """
 
     name: str
     html: str | None = None
     css: str | Path | None = None
     js: str | Path | None = None
+    isolate_styles: bool = True
     # Process the content and store it in these private fields
     _processed_html: str | None = field(default=None, init=False, repr=False)
     _processed_css: str | None = field(default=None, init=False, repr=False)
@@ -161,6 +164,7 @@ class BidiComponentRegistry:
         html: str | None = None,
         css: str | Path | None = None,
         js: str | Path | None = None,
+        isolate_styles: bool = True,
     ) -> None:
         """Register a component definition.
 
@@ -185,6 +189,8 @@ class BidiComponentRegistry:
         js : str, Path, or None
             JavaScript content as a string, or a path to a JS file.
             Only used if name_or_definition is a string.
+        isolate_styles : bool
+            Whether to isolate styles for the component.
         """
         # Determine if we were given a definition or parameters to create one
         if isinstance(name_or_definition, BidiComponentDefinition):
@@ -196,6 +202,7 @@ class BidiComponentRegistry:
                 html=html,
                 css=css,
                 js=js,
+                isolate_styles=isolate_styles,
             )
 
         # Register the definition

@@ -29,6 +29,7 @@ def component(
     html: str | None = None,
     css: str | Path | None = None,
     js: str | Path | None = None,
+    isolate_styles: bool = True,
 ) -> Callable[..., BidiComponentState]:
     """Register a bidirectional component.
 
@@ -45,6 +46,9 @@ def component(
         CSS content as a string, or a path to a CSS file.
     js : str, Path, or None
         JavaScript content as a string, or a path to a JS file.
+    isolate_styles : bool, default True
+        Whether to isolate the component's CSS styles to avoid affecting other elements.
+        Set to False if you want the component's styles to affect the entire page.
 
     Returns
     -------
@@ -73,7 +77,13 @@ def component(
     from streamlit import get_bidi_component_registry
 
     registry = get_bidi_component_registry()
-    registry.register(name, html=html, css=css, js=js)
+    registry.register(
+        name,
+        html=html,
+        css=css,
+        js=js,
+        isolate_styles=isolate_styles,
+    )
 
     # Create a wrapper function that calls st.bidi_component with the registered component name
     @functools.wraps(st.bidi_component)

@@ -192,9 +192,7 @@ class BidiComponentMixin:
         bidi_component_proto.js_content = component_def.js_content or ""
         bidi_component_proto.html_content = component_def.html_content or ""
         bidi_component_proto.css_content = component_def.css_content or ""
-        bidi_component_proto.isolate_styles = (
-            True  # Default to isolating styles for registered components
-        )
+        bidi_component_proto.isolate_styles = component_def.isolate_styles
         bidi_component_proto.data = json.dumps(data) if data else ""
         bidi_component_proto.child_container_count = child_container_count
         bidi_component_proto.form_id = current_form_id(self.dg)

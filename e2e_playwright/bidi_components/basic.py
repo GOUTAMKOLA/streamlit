@@ -11,10 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 import streamlit as st
 
-DEFAULT_JS_CODE = """export default function(component) {
+# Initialize session state to store component code
+if "js_code" not in st.session_state:
+    st.session_state.js_code = """export default function(component) {
   console.log("I am a bidi component", component)
 
   const { parentElement } = component
@@ -34,10 +37,10 @@ DEFAULT_JS_CODE = """export default function(component) {
     console.log("Cleaning up")
     form.removeEventListener("submit", handleSubmit)
   }
-}
-"""
+}"""
 
-DEFAULT_HTML_CODE = """<div>
+if "html_code" not in st.session_state:
+    st.session_state.html_code = """<div>
   <h1>Hello World</h1>
   <form>
     <label for="range">Range</label>
@@ -46,27 +49,50 @@ DEFAULT_HTML_CODE = """<div>
     <input type="text" id="text" value="Text input" />
     <button type="submit">Submit form</button>
   </form>
-</div>
-"""
+</div>"""
 
-DEFAULT_CSS_CODE = """div {
+if "css_code" not in st.session_state:
+    st.session_state.css_code = """div {
   color: red;
-}
-"""
+}"""
+
+
+def my_component(*, key: str | None = None, isolate_styles: bool = True):
+    # Get a callable function that renders the component
+    render_component = st.components.v2.component(
+        name="my_component",
+        js=st.session_state.js_code,
+        html=st.session_state.html_code,
+        css=st.session_state.css_code,
+        isolate_styles=isolate_styles,
+    )
+
+    # Call the function to render the component
+    out = render_component(key=key)
+    return out
+
+
+def update_component():
+    # Update session state with form values
+    st.session_state.js_code = st.session_state.js_editor
+    st.session_state.html_code = st.session_state.html_editor
+    st.session_state.css_code = st.session_state.css_editor
+
 
 st.write("# Bidi Component Editor")
 
 # Create a form for editing the component code
-with st.form("bidi_editor"):
-    js_code = st.text_area("JavaScript Code", DEFAULT_JS_CODE, height=200)
-    html_code = st.text_area("HTML Code", DEFAULT_HTML_CODE, height=200)
-    css_code = st.text_area("CSS Code", DEFAULT_CSS_CODE, height=200)
-    isolate_styles = st.checkbox("Isolate Styles", value=True)
-    submit_button = st.form_submit_button("Update Component")
+st.write("## Edit Component")
+with st.form("bidi_editor", clear_on_submit=False):
+    st.text_area(
+        "JavaScript Code", st.session_state.js_code, height=200, key="js_editor"
+    )
+    st.text_area("HTML Code", st.session_state.html_code, height=200, key="html_editor")
+    st.text_area("CSS Code", st.session_state.css_code, height=200, key="css_editor")
+    st.checkbox("Isolate Styles", value=True, key="isolate_styles")
+    submit_button = st.form_submit_button("Update Component", on_click=update_component)
 
-st.bidi_component(
-    js=js_code,
-    html=html_code,
-    css=css_code,
-    isolate_styles=isolate_styles,
-)
+st.write("## Component Instances")
+# Display the components - these will update when the form is submitted
+my_component(isolate_styles=st.session_state.isolate_styles)
+my_component(key="my_component_2", isolate_styles=st.session_state.isolate_styles)
