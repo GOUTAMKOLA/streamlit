@@ -179,6 +179,13 @@ const IsolatedComponent: FC<{
       return
     }
 
+    // Don't try to attach a shadow root if the element already has one
+    if (containerRef.current.shadowRoot) {
+      shadowRootRef.current = containerRef.current.shadowRoot
+      setIsShadowRootReady(true)
+      return
+    }
+
     try {
       shadowRootRef.current = containerRef.current.attachShadow({
         mode: "open",
