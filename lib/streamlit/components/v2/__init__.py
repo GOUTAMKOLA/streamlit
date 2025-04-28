@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-def register_component(
+def component(
     name: str,
     html: str | None = None,
     css: str | Path | None = None,
@@ -45,18 +45,20 @@ def register_component(
     Examples
     --------
     >>> import streamlit as st
-    >>> from streamlit.components.v2 import register_component
     >>>
     >>> # Register a component with HTML, CSS, and JS
-    >>> register_component(
-    ...     name="my_component",
-    ...     html="<div>Hello world</div>",
-    ...     css="div { color: red; }",
-    ...     js="console.log('Hello from JS')",
-    ... )
+    >>> def emoji_icon(emoji: str):
+    ...     component_name = "emojiIconComponent"
+    ...     out = st.components.v2.component(
+    ...         name=component_name,
+    ...         html=f"<div>{emoji}</div>",
+    ...         css="div { font-size: 2em; }",
+    ...     )
+    ...
+    ...     return out
     >>>
     >>> # Use the component in a Streamlit app
-    >>> st.bidi_component("my_component")
+    >>> emoji_icon("🚀")
     """
     from streamlit import get_bidi_component_registry
 
