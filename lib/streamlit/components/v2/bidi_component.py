@@ -63,6 +63,9 @@ class BidiComponentSerde:
     Assumes communication via JSON strings.
     """
 
+    # Store the default value for deserialization fallback
+    default_value: Any = None
+
     def deserialize(
         self,
         ui_value: str | None,
@@ -78,7 +81,11 @@ class BidiComponentSerde:
         -------
             The deserialized state wrapped in an AttributeDictionary.
         """
-        deserialized_value = json.loads(ui_value) if ui_value is not None else None
+        try:
+            deserialized_value = json.loads(ui_value) if ui_value is not None else None
+        except Exception:
+            deserialized_value = self.default_value
+
         state: BidiComponentState = {"value": deserialized_value}
         return cast("BidiComponentState", AttributeDictionary(state))
 
@@ -103,34 +110,23 @@ class BidiComponentMixin:
     @gather_metrics("bidi_component")
     def bidi_component(
         self,
-        *,  # Make following args keyword-only
-        js: str | None = None,
-        html: str | None = None,
-        css: str | None = None,
-        isolate_styles: bool = False,
-        data: Any = None,
-        child_container_count: int = 0,
+        component_name: str,
+        *args,
         key: str | None = None,
         default: Any = None,
         on_change: WidgetCallback | None = None,
+        child_container_count: int = 0,
+        **kwargs,
     ) -> BidiComponentState:
-        """Add a bidirectional component instance to the app.
+        """Add a bidirectional component instance to the app using a registered component.
 
         Parameters
         ----------
-        js : str or None
-            The JavaScript code string for the component.
-        html : str or None
-            Optional HTML content to render in the component container.
-            This content is injected before the JavaScript executes.
-        css : str or None
-            Optional CSS content to apply to the component.
-        isolate_styles : bool
-            Whether to isolate styles from the parent. Default is False.
-        data : any or None
-            The JSON serializable data to pass to the component.
-        child_container_count : int
-            The number of child containers this component has. Default is 0.
+        component_name : str
+            The name of the registered component to use. The component's HTML, CSS,
+            and JS will be loaded from the registry.
+        *args
+            Positional arguments to pass to the component.
         key : str or None
             An optional string to use as the unique key for the component.
             If this is omitted, a key will be generated based on the
@@ -140,65 +136,82 @@ class BidiComponentMixin:
             the component's frontend hasn't yet specified a value.
         on_change: WidgetCallback or None
             An optional callback invoked when the component's value changes.
+        child_container_count : int
+            The number of child containers this component has. Default is 0.
+        **kwargs
+            Keyword arguments to pass to the component.
 
         Returns
         -------
         BidiComponentState
             A dictionary-like object representing the component's state,
             supporting attribute and key-based access for the 'value' field.
+
+        Raises
+        ------
+        ValueError
+            If the component is not registered in the registry.
         """
         check_cache_replay_rules()
 
         key = to_key(key)
-
-        # TODO: Add validation for the 'js' string? (e.g., basic syntax check?)
-
         ctx = get_script_run_ctx()
 
-        # --- Widget Registration ---
-        # The component's identity is determined by its name, form, the provided key,
-        # AND the JS content itself. Changing the JS content will result in a new
-        # widget ID and reset its state.
+        if ctx is None:
+            # Create an empty state with the default value and return it
+            state: BidiComponentState = {"value": default}
+            return cast("BidiComponentState", AttributeDictionary(state))
+
+        # Get the component definition from the registry
+        from streamlit.runtime import Runtime
+
+        registry = Runtime.instance().bidi_component_registry
+        component_def = registry.get(component_name)
+
+        if component_def is None:
+            raise ValueError(f"Component '{component_name}' is not registered")
+
+        # Create a data payload with args and kwargs
+        data = {}
+        if args:
+            data["args"] = args
+        if kwargs:
+            data["kwargs"] = kwargs
+
+        # Compute a unique ID for this component instance
         computed_id = compute_and_register_element_id(
-            INTERNAL_COMPONENT_NAME,
+            component_name,
             user_key=key,
             form_id=current_form_id(self.dg),
-            js_content=js,
-            html_content=html,
-            css_content=css,
-            child_container_count=child_container_count,
-            isolate_styles=isolate_styles,
-            # Add other relevant args here if they affect identity and should cause a reset
         )
 
+        # Set up the component proto
         bidi_component_proto = BidiComponentProto()
-        bidi_component_proto.component_name = INTERNAL_COMPONENT_NAME
-        # TODO: Update the args to be HTML, OR JS, OR both
-        bidi_component_proto.js_content = js or ""
-        bidi_component_proto.html_content = html or ""  # Set empty string if None
-        bidi_component_proto.css_content = css or ""  # Set empty string if None
-        bidi_component_proto.isolate_styles = isolate_styles
-        bidi_component_proto.data = json.dumps(data) if data is not None else ""
+        bidi_component_proto.id = computed_id
+        bidi_component_proto.component_name = component_name
+        bidi_component_proto.js_content = component_def.js_content or ""
+        bidi_component_proto.html_content = component_def.html_content or ""
+        bidi_component_proto.css_content = component_def.css_content or ""
+        bidi_component_proto.isolate_styles = (
+            True  # Default to isolating styles for registered components
+        )
+        bidi_component_proto.data = json.dumps(data) if data else ""
         bidi_component_proto.child_container_count = child_container_count
         bidi_component_proto.form_id = current_form_id(self.dg)
-        bidi_component_proto.id = computed_id
 
         # Instantiate the Serde for this component instance
-        serde = BidiComponentSerde()
+        serde = BidiComponentSerde(default_value=default)
 
         component_state = register_widget(
             bidi_component_proto.id,
-            # Pass the methods from the Serde object
             deserializer=serde.deserialize,
             serializer=serde.serialize,
             ctx=ctx,
             on_change_handler=on_change,
-            # Keep value_type as before, register_widget requires it
             value_type="json_value",
         )
 
-        # Enqueue using the dg instance and return the result of enqueue (a DeltaGenerator)
-        # The actual widget value is handled by the state management
+        # Enqueue using the dg instance
         self.dg._enqueue(INTERNAL_COMPONENT_NAME, bidi_component_proto)
 
         return cast("BidiComponentState", component_state.value)
