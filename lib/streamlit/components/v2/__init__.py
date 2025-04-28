@@ -14,10 +14,14 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import functools
+from typing import TYPE_CHECKING, Any, Callable
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from streamlit.components.v2.bidi_component import BidiComponentState
+    from streamlit.runtime.state.common import WidgetCallback
 
 
 def component(
@@ -25,7 +29,7 @@ def component(
     html: str | None = None,
     css: str | Path | None = None,
     js: str | Path | None = None,
-) -> None:
+) -> Callable[..., BidiComponentState]:
     """Register a bidirectional component.
 
     This function registers a bidirectional component in the component registry.
@@ -41,6 +45,11 @@ def component(
         CSS content as a string, or a path to a CSS file.
     js : str, Path, or None
         JavaScript content as a string, or a path to a JS file.
+
+    Returns
+    -------
+    Callable
+        A callable function that creates instances of the registered component.
 
     Examples
     --------
@@ -60,7 +69,43 @@ def component(
     >>> # Use the component in a Streamlit app
     >>> emoji_icon("🚀")
     """
+    import streamlit as st
     from streamlit import get_bidi_component_registry
 
     registry = get_bidi_component_registry()
     registry.register(name, html=html, css=css, js=js)
+
+    # Create a wrapper function that calls st.bidi_component with the registered component name
+    @functools.wraps(st.bidi_component)
+    def component_instance(
+        *args,
+        key: str | None = None,
+        default: Any = None,
+        on_change: WidgetCallback | None = None,
+        **kwargs,
+    ) -> BidiComponentState:
+        """Create an instance of the registered component.
+
+        Parameters
+        ----------
+        *args
+            Positional arguments to pass to the component.
+        key : str or None
+            An optional string to use as the unique key for the component.
+        default: any or None
+            The default return value for the component.
+        on_change: WidgetCallback or None
+            An optional callback invoked when the component's value changes.
+        **kwargs
+            Keyword arguments to pass to the component.
+
+        Returns
+        -------
+        BidiComponentState
+            The component's state.
+        """
+        return st.bidi_component(
+            name, *args, key=key, default=default, on_change=on_change, **kwargs
+        )
+
+    return component_instance
