@@ -311,6 +311,24 @@ experimental_set_query_params = _deprecate_func_name(
 )
 
 
+def get_bidi_component_registry():
+    """Returns the singleton BidiComponentRegistry instance.
+
+    Returns
+    -------
+    BidiComponentRegistry
+        The singleton BidiComponentRegistry instance.
+    """
+    from streamlit.components.v2.component_registry import BidiComponentRegistry
+    from streamlit.runtime import Runtime
+
+    if Runtime.exists():
+        return Runtime.instance().bidi_component_registry
+    else:
+        # Return a local registry when running without the streamlit runtime
+        return BidiComponentRegistry()
+
+
 # make it possible to call streamlit.components.v1.html etc. by importing it here
 # import in the very end to avoid partially-initialized module import errors, because
 # streamlit.components.v1 also uses some streamlit imports

@@ -11,3 +11,54 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+
+def register_component(
+    name: str,
+    html: str | None = None,
+    css: str | Path | None = None,
+    js: str | Path | None = None,
+) -> None:
+    """Register a bidirectional component.
+
+    This function registers a bidirectional component in the component registry.
+    The component can then be used in Streamlit apps via st.bidi_component.
+
+    Parameters
+    ----------
+    name : str
+        A short, descriptive name for the component.
+    html : str or None
+        HTML content as a string.
+    css : str, Path, or None
+        CSS content as a string, or a path to a CSS file.
+    js : str, Path, or None
+        JavaScript content as a string, or a path to a JS file.
+
+    Examples
+    --------
+    >>> import streamlit as st
+    >>> from streamlit.components.v2 import register_component
+    >>>
+    >>> # Register a component with HTML, CSS, and JS
+    >>> register_component(
+    ...     name="my_component",
+    ...     html="<div>Hello world</div>",
+    ...     css="div { color: red; }",
+    ...     js="console.log('Hello from JS')",
+    ... )
+    >>>
+    >>> # Use the component in a Streamlit app
+    >>> st.bidi_component("my_component")
+    """
+    from streamlit import get_bidi_component_registry
+
+    registry = get_bidi_component_registry()
+    registry.register(name, html=html, css=css, js=js)
