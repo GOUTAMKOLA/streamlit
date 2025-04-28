@@ -56,15 +56,18 @@ if "css_code" not in st.session_state:
   color: red;
 }"""
 
+if "isolate_styles" not in st.session_state:
+    st.session_state.isolate_styles = True
 
-def my_component(*, key: str | None = None, isolate_styles: bool = True):
+
+def my_component(*, key: str | None = None):
     # Get a callable function that renders the component
     render_component = st.components.v2.component(
         name="my_component",
         js=st.session_state.js_code,
         html=st.session_state.html_code,
         css=st.session_state.css_code,
-        isolate_styles=isolate_styles,
+        isolate_styles=st.session_state.isolate_styles,
     )
 
     # Call the function to render the component
@@ -77,6 +80,7 @@ def update_component():
     st.session_state.js_code = st.session_state.js_editor
     st.session_state.html_code = st.session_state.html_editor
     st.session_state.css_code = st.session_state.css_editor
+    st.session_state.isolate_styles = st.session_state.isolate_styles_checkbox
 
 
 st.write("# Bidi Component Editor")
@@ -89,10 +93,14 @@ with st.form("bidi_editor", clear_on_submit=False):
     )
     st.text_area("HTML Code", st.session_state.html_code, height=200, key="html_editor")
     st.text_area("CSS Code", st.session_state.css_code, height=200, key="css_editor")
-    st.checkbox("Isolate Styles", value=True, key="isolate_styles")
+    st.checkbox(
+        "Isolate Styles",
+        value=st.session_state.isolate_styles,
+        key="isolate_styles_checkbox",
+    )
     submit_button = st.form_submit_button("Update Component", on_click=update_component)
 
 st.write("## Component Instances")
 # Display the components - these will update when the form is submitted
-my_component(isolate_styles=st.session_state.isolate_styles)
-my_component(key="my_component_2", isolate_styles=st.session_state.isolate_styles)
+my_component()
+# my_component(key="my_component_2")

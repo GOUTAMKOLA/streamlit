@@ -26,136 +26,204 @@ export type BidiComponentProps = {
   element: BidiComponentProto
 }
 
-interface UseShadowDomResult {
-  containerRef: React.RefObject<HTMLDivElement>
-  shadowRootRef: React.RefObject<ShadowRoot | null>
-}
-
-const useShadowDom = (
-  id: string,
-  isolateStyles: boolean
-): UseShadowDomResult => {
+// Component for isolated styles (shadow DOM)
+const IsolatedComponent: FC<{
+  id: string
+  jsContent: string
+  htmlContent: string
+  cssContent: string
+}> = ({ id, jsContent, htmlContent: html, cssContent }) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const shadowRootRef = useRef<ShadowRoot | null>(null)
+  const contentRef = useRef<HTMLDivElement | null>(null)
+  const componentId = useId()
 
+  // Create shadow DOM once when component mounts
   useEffect(() => {
     if (!containerRef.current) {
       return
     }
 
-    const containerElement = containerRef.current
-
-    // Create shadow root if isolateStyles is true
-    if (isolateStyles && !shadowRootRef.current) {
-      try {
-        shadowRootRef.current = containerElement.attachShadow({ mode: "open" })
-      } catch (error) {
-        LOG.error(
-          `BidiComponent Error: Failed to create shadow DOM for element ${id}`,
-          error
-        )
-      }
+    try {
+      shadowRootRef.current = containerRef.current.attachShadow({
+        mode: "open",
+      })
+    } catch (error) {
+      LOG.error(
+        `BidiComponent Error: Failed to create shadow DOM for element ${id}`,
+        error
+      )
     }
-  }, [id, isolateStyles])
+  }, [id])
 
-  return { containerRef, shadowRootRef }
-}
-
-const useHtmlCssContent = ({
-  isolateStyles,
-  html,
-  css,
-  containerRef,
-  shadowRootRef,
-}: {
-  isolateStyles: boolean
-  html: string
-  css: string
-  containerRef: React.RefObject<HTMLDivElement>
-  shadowRootRef: React.RefObject<ShadowRoot | null>
-}): void => {
-  const contentContainerRef = useRef<HTMLDivElement | null>(null)
-
+  // Handle HTML and CSS content
   useEffect(() => {
-    if (!containerRef.current) {
+    if (!shadowRootRef.current) {
       return
     }
-
-    // Determine parent element (shadow root or container)
-    const parent =
-      isolateStyles && shadowRootRef.current
-        ? shadowRootRef.current
-        : containerRef.current
 
     // Clean up previous content
     if (
-      contentContainerRef.current &&
-      contentContainerRef.current.parentNode === parent
+      contentRef.current &&
+      contentRef.current.parentNode === shadowRootRef.current
     ) {
-      parent.removeChild(contentContainerRef.current)
+      shadowRootRef.current.removeChild(contentRef.current)
     }
 
-    // Create content container if needed
-    if (html || css) {
-      contentContainerRef.current = document.createElement("div")
+    // Create new content container
+    contentRef.current = document.createElement("div")
 
-      // Add HTML content if available
-      if (html) {
-        const htmlDiv = document.createElement("div")
-        htmlDiv.innerHTML = html
-        contentContainerRef.current.appendChild(htmlDiv)
-      }
-
-      // Add CSS content if available
-      if (css) {
-        const styleElement = document.createElement("style")
-        styleElement.textContent = css
-        contentContainerRef.current.appendChild(styleElement)
-      }
-
-      parent.appendChild(contentContainerRef.current)
+    // Add HTML content if available
+    if (html) {
+      const htmlDiv = document.createElement("div")
+      htmlDiv.innerHTML = html
+      contentRef.current.appendChild(htmlDiv)
     }
-  }, [isolateStyles, html, css, containerRef, shadowRootRef])
-}
 
-const useJavaScriptContent = ({
-  id,
-  jsContent,
-  isolateStyles,
-  componentId,
-  containerRef,
-  shadowRootRef,
-}: {
-  id: string
-  jsContent: string
-  isolateStyles: boolean
-  componentId: string
-  containerRef: React.RefObject<HTMLDivElement>
-  shadowRootRef: React.RefObject<ShadowRoot | null>
-}): void => {
+    // Add CSS content if available
+    if (cssContent) {
+      const styleElement = document.createElement("style")
+      styleElement.textContent = cssContent
+      contentRef.current.appendChild(styleElement)
+    }
+
+    shadowRootRef.current.appendChild(contentRef.current)
+  }, [html, cssContent])
+
+  // Handle JavaScript content
   useEffect(() => {
-    if (!jsContent) {
-      LOG.error("BidiComponent Error: No JavaScript content provided.")
+    if (!jsContent || !shadowRootRef.current) {
       return
     }
 
+    let isMounted = true
+    let cleanup: (() => void) | undefined
+
+    const dataUri = `data:text/javascript;charset=utf-8,${encodeURIComponent(
+      jsContent
+    )}`
+
+    const handleImport = async (): Promise<void> => {
+      try {
+        const module = await import(/* @vite-ignore */ dataUri)
+
+        if (!isMounted || !shadowRootRef.current) {
+          return
+        }
+
+        if (module.default && typeof module.default === "function") {
+          const result = module.default({
+            name: "",
+            data: null,
+            key: componentId,
+            parentElement: shadowRootRef.current,
+            childContainerIDs: [],
+          })
+
+          if (typeof result === "function") {
+            cleanup = result
+          }
+        } else {
+          LOG.error(
+            "BidiComponent Error: Module does not have a default export function.",
+            id
+          )
+        }
+      } catch (error) {
+        if (isMounted) {
+          LOG.error(
+            `BidiComponent Error: Failed to load or execute script for element ${id}`,
+            error
+          )
+        }
+      }
+    }
+
+    handleImport()
+
+    return () => {
+      isMounted = false
+      if (cleanup) {
+        try {
+          cleanup()
+        } catch (error) {
+          LOG.error(
+            `BidiComponent Error: Failed to run cleanup for element ${id}`,
+            error
+          )
+        }
+      }
+    }
+    // NOTE: Intentionally only running on mount to achieve product behavior
+    // eslint-disable-next-line react-compiler/react-compiler
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  return <div ref={containerRef} data-testid="stBidiComponent-isolated" />
+}
+
+// Component for non-isolated styles (regular DOM)
+const NonIsolatedComponent: FC<{
+  id: string
+  jsContent: string
+  htmlContent: string
+  cssContent: string
+}> = ({ id, jsContent, htmlContent: html, cssContent }) => {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLDivElement | null>(null)
+  const componentId = useId()
+
+  // Handle HTML and CSS content
+  useEffect(() => {
     if (!containerRef.current) {
-      LOG.error("BidiComponent Error: No container element provided.")
+      return
+    }
+
+    // Clean up previous content
+    if (
+      contentRef.current &&
+      contentRef.current.parentNode === containerRef.current
+    ) {
+      containerRef.current.removeChild(contentRef.current)
+    }
+
+    // Create new content container
+    contentRef.current = document.createElement("div")
+
+    // Add HTML content if available
+    if (html) {
+      const htmlDiv = document.createElement("div")
+      htmlDiv.innerHTML = html
+      contentRef.current.appendChild(htmlDiv)
+    }
+
+    // Add CSS content if available
+    if (cssContent) {
+      const styleElement = document.createElement("style")
+      styleElement.textContent = cssContent
+      contentRef.current.appendChild(styleElement)
+    }
+
+    containerRef.current.appendChild(contentRef.current)
+  }, [html, cssContent])
+
+  // Handle JavaScript content
+  useEffect(() => {
+    if (!jsContent || !containerRef.current) {
       return
     }
 
     // Track mounted state to prevent race conditions
     let isMounted = true
+    // Store cleanup function from module if provided
+    // NOTE: This is a modification from the spec to allow for a cleanup function
+    // to be returned from the module.
+    let cleanup: (() => void) | undefined
 
     // Construct a data URI for the JavaScript content
     const dataUri = `data:text/javascript;charset=utf-8,${encodeURIComponent(
       jsContent
     )}`
-
-    // Store cleanup function from module if provided
-    // NOTE: This is a modification from the spec to allow for a cleanup function
-    // to be returned from the module.
-    let cleanup: (() => void) | undefined
 
     const handleImport = async (): Promise<void> => {
       try {
@@ -163,24 +231,18 @@ const useJavaScriptContent = ({
         const module = await import(/* @vite-ignore */ dataUri)
 
         // Check if component is still mounted before continuing
-        if (!isMounted) {
+        if (!isMounted || !containerRef.current) {
           return
         }
 
         if (module.default && typeof module.default === "function") {
-          // Determine parent element (shadow root or container)
-          const parentElement =
-            isolateStyles && shadowRootRef.current
-              ? shadowRootRef.current
-              : containerRef.current
-
           const result = module.default({
             // TODO: Add a name
             name: "",
             // TODO: Add data
             data: null,
             key: componentId,
-            parentElement,
+            parentElement: containerRef.current,
             // TODO: Add child container IDs
             childContainerIDs: [],
           })
@@ -225,12 +287,13 @@ const useJavaScriptContent = ({
         )
       }
     }
-
     // NOTE: Intentionally only running on mount in order to achieve the product behavior of
     // not allowing `jsContent` to be updated after the component is mounted.
     // eslint-disable-next-line react-compiler/react-compiler
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  return <div ref={containerRef} data-testid="stBidiComponent-regular" />
 }
 
 const useProcessBidiElement = (
@@ -252,21 +315,23 @@ const BidiComponent: FC<BidiComponentProps> = ({ element }) => {
   const { id, jsContent, isolateStyles } = element
 
   const { html, css } = useProcessBidiElement(element)
-  const { containerRef, shadowRootRef } = useShadowDom(id, isolateStyles)
-  const componentId = useId()
 
-  useHtmlCssContent({ isolateStyles, html, css, containerRef, shadowRootRef })
-
-  useJavaScriptContent({
-    id,
-    jsContent,
-    isolateStyles,
-    componentId,
-    containerRef,
-    shadowRootRef,
-  })
-
-  return <div ref={containerRef} data-testid="stBidiComponent" />
+  // Render either isolated or non-isolated component based on isolateStyles flag
+  return isolateStyles ? (
+    <IsolatedComponent
+      cssContent={css}
+      htmlContent={html}
+      id={id}
+      jsContent={jsContent}
+    />
+  ) : (
+    <NonIsolatedComponent
+      cssContent={css}
+      htmlContent={html}
+      id={id}
+      jsContent={jsContent}
+    />
+  )
 }
 
 export default memo(BidiComponent)
