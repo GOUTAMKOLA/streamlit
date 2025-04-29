@@ -93,7 +93,7 @@ const useHandleJsContent = ({
   parentRef: React.RefObject<HTMLDivElement | ShadowRoot | null>
   skip?: boolean
 }): void => {
-  const componentId = useId()
+  const componentId = `st-bidi-component-${useId()}`
 
   useEffect(() => {
     if (skip || !jsContent || !parentRef.current) {
