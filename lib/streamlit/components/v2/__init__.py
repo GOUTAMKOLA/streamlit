@@ -26,6 +26,24 @@ if TYPE_CHECKING:
     from streamlit.runtime.state.common import WidgetCallback
 
 
+def get_bidi_component_registry():
+    """Returns the singleton BidiComponentRegistry instance.
+
+    Returns
+    -------
+    BidiComponentRegistry
+        The singleton BidiComponentRegistry instance.
+    """
+    from streamlit.components.v2.component_registry import BidiComponentRegistry
+    from streamlit.runtime import Runtime
+
+    if Runtime.exists():
+        return Runtime.instance().bidi_component_registry
+    else:
+        # Return a local registry when running without the streamlit runtime
+        return BidiComponentRegistry()
+
+
 def component(
     name: str,
     html: str | None = None,
@@ -76,7 +94,6 @@ def component(
     >>> emoji_icon("🚀")
     """
     import streamlit as st
-    from streamlit import get_bidi_component_registry
 
     # Get our stack frame.
     current_frame: FrameType | None = inspect.currentframe()
