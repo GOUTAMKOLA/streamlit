@@ -13,6 +13,8 @@
 # limitations under the License.
 from __future__ import annotations
 
+import random
+
 import streamlit as st
 
 # Initialize session state to store component code
@@ -63,7 +65,10 @@ if "isolate_styles" not in st.session_state:
 def my_component(*, key: str | None = None, data: str | None = None):
     # Get a callable function that renders the component
     render_component = st.components.v2.component(
-        name="my_component",
+        # For demo purposes, we'll use a random name to avoid collisions
+        # and to ensure that the component is re-created when the form is
+        # submitted.
+        name=f"my_component-{random.randint(0, 1000000)}",
         js=st.session_state.js_code,
         html=st.session_state.html_code,
         css=st.session_state.css_code,
