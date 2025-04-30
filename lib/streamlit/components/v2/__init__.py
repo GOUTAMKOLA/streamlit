@@ -15,10 +15,12 @@
 from __future__ import annotations
 
 import functools
+import inspect
 from typing import TYPE_CHECKING, Any, Callable
 
 if TYPE_CHECKING:
     from pathlib import Path
+    from types import FrameType
 
     from streamlit.components.v2.bidi_component import BidiComponentState
     from streamlit.runtime.state.common import WidgetCallback
@@ -76,8 +78,20 @@ def component(
     import streamlit as st
     from streamlit import get_bidi_component_registry
 
+    # Get our stack frame.
+    current_frame: FrameType | None = inspect.currentframe()
+    if current_frame is None:
+        raise RuntimeError("Failed to get current frame")
+
+    # Get the stack frame of our calling function.
+    caller_frame = current_frame.f_back
+    if caller_frame is None:
+        raise RuntimeError("Failed to get caller frame")
+
     registry = get_bidi_component_registry()
     registry.register(
+        # TODO: Build a module name by sharing code with v1 (_get_module_name)
+        # to prevent collisions
         name,
         html=html,
         css=css,
