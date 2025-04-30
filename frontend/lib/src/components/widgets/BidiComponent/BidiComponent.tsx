@@ -47,7 +47,7 @@ const useHandleHtmlAndCssContent = ({
     }
 
     const parent = isShadowRoot
-      ? (containerRef.current.shadowRoot as ShadowRoot)
+      ? containerRef.current.shadowRoot
       : containerRef.current
 
     if (!parent) {
@@ -161,7 +161,7 @@ const useHandleJsContent = ({
     // NOTE: Intentionally only running on mount to achieve product behavior
     // eslint-disable-next-line react-compiler/react-compiler
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [skip])
 }
 
 const IsolatedComponent: FC<{
