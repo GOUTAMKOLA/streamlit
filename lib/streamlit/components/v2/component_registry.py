@@ -158,14 +158,7 @@ class BidiComponentRegistry:
         self._components: MutableMapping[str, BidiComponentDefinition] = {}
         self._lock = threading.Lock()
 
-    def register(
-        self,
-        name_or_definition: str | BidiComponentDefinition,
-        html: str | None = None,
-        css: str | Path | None = None,
-        js: str | Path | None = None,
-        isolate_styles: bool = True,
-    ) -> None:
+    def register(self, definition: BidiComponentDefinition) -> None:
         """Register a component definition.
 
         This method accepts either a BidiComponentDefinition object or
@@ -179,31 +172,11 @@ class BidiComponentRegistry:
 
         Parameters
         ----------
-        name_or_definition : str or BidiComponentDefinition
-            Either a component name (string) or a BidiComponentDefinition object.
-        html : str or None
-            HTML content as a string. Only used if name_or_definition is a string.
-        css : str, Path, or None
-            CSS content as a string, or a path to a CSS file.
-            Only used if name_or_definition is a string.
-        js : str, Path, or None
-            JavaScript content as a string, or a path to a JS file.
-            Only used if name_or_definition is a string.
-        isolate_styles : bool
-            Whether to isolate styles for the component.
+        definition : BidiComponentDefinition
+            A BidiComponentDefinition object.
         """
-        # Determine if we were given a definition or parameters to create one
-        if isinstance(name_or_definition, BidiComponentDefinition):
-            definition = name_or_definition
-        else:
-            # Create a new definition
-            definition = BidiComponentDefinition(
-                name=name_or_definition,
-                html=html,
-                css=css,
-                js=js,
-                isolate_styles=isolate_styles,
-            )
+
+        # TODO: Handle the absolute path case
 
         # Register the definition
         with self._lock:

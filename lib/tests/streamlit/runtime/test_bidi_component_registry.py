@@ -17,7 +17,10 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from streamlit.components.v2.component_registry import BidiComponentRegistry
+from streamlit.components.v2.component_registry import (
+    BidiComponentDefinition,
+    BidiComponentRegistry,
+)
 from streamlit.runtime.runtime import Runtime, RuntimeConfig
 
 
@@ -51,7 +54,12 @@ class BidiComponentRegistryTest(unittest.TestCase):
         """Test that a custom BidiComponentRegistry can be provided to the runtime."""
         # Create a custom registry
         custom_registry = BidiComponentRegistry()
-        custom_registry.register("test_component", html="<div>Test</div>")
+        custom_registry.register(
+            BidiComponentDefinition(
+                name="test_component",
+                html="<div>Test</div>",
+            )
+        )
 
         # Create a mock config with our custom registry
         config = RuntimeConfig(

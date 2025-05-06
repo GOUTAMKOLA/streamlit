@@ -32,6 +32,10 @@ if "js_code" not in st.session_state:
       range: event.target.range.value,
       text: event.target.text.value,
     })
+    alert("Form submitted with values: " + JSON.stringify({
+      range: event.target.range.value,
+      text: event.target.text.value,
+    }))
   }
 
   form.addEventListener("submit", handleSubmit)

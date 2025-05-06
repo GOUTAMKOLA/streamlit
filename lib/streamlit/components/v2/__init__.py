@@ -18,6 +18,8 @@ import functools
 import inspect
 from typing import TYPE_CHECKING, Any, Callable
 
+from streamlit.components.v2.component_registry import BidiComponentDefinition
+
 if TYPE_CHECKING:
     from pathlib import Path
     from types import FrameType
@@ -107,13 +109,15 @@ def component(
 
     registry = get_bidi_component_registry()
     registry.register(
-        # TODO: Build a module name by sharing code with v1 (_get_module_name)
-        # to prevent collisions
-        name,
-        html=html,
-        css=css,
-        js=js,
-        isolate_styles=isolate_styles,
+        BidiComponentDefinition(
+            # TODO: Build a module name by sharing code with v1 (_get_module_name)
+            # to prevent collisions
+            name=name,
+            html=html,
+            css=css,
+            js=js,
+            isolate_styles=isolate_styles,
+        )
     )
 
     # Create a wrapper function that calls st.bidi_component with the registered component name
