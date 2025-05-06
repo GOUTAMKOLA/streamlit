@@ -115,12 +115,28 @@ class BidiComponentDefinition:
     _processed_html: str | None = field(default=None, init=False, repr=False)
     _processed_css: str | None = field(default=None, init=False, repr=False)
     _processed_js: str | None = field(default=None, init=False, repr=False)
+    _source_paths: dict[str, str] = field(default_factory=dict, init=False, repr=False)
 
     def __post_init__(self):
+        # Keep track of source paths for content loaded from files
+        source_paths = {}
+
         # Process and store the content
+        # HTML is always treated as a string, not a file path
         object.__setattr__(self, "_processed_html", self.html)
-        object.__setattr__(self, "_processed_css", _process_content(self.css))
-        object.__setattr__(self, "_processed_js", _process_content(self.js))
+
+        # CSS and JS can be either strings or file paths
+        css_content, css_path = self._process_as_content_or_path(self.css)
+        js_content, js_path = self._process_as_content_or_path(self.js)
+
+        if css_path:
+            source_paths["css"] = os.path.dirname(css_path)
+        if js_path:
+            source_paths["js"] = os.path.dirname(js_path)
+
+        object.__setattr__(self, "_processed_css", css_content)
+        object.__setattr__(self, "_processed_js", js_content)
+        object.__setattr__(self, "_source_paths", source_paths)
 
         # Validate that at least one content type is provided
         if (
@@ -131,6 +147,78 @@ class BidiComponentDefinition:
             raise ValueError(
                 "BidiComponentDefinition must have at least one of html, css, or js."
             )
+
+    def _process_as_content_or_path(
+        self, content: str | Path | None
+    ) -> tuple[str | None, str | None]:
+        """Process content which could be a string or file path.
+
+        Returns
+        -------
+            A tuple (content, source_path) where:
+            - content: The loaded content string if input is a path, or the original string
+            - source_path: The absolute path to the source file if input is a path, or None
+        """
+        if content is None:
+            return None, None
+
+        if isinstance(content, Path):
+            content_str = str(content)
+            # Path objects are always treated as file paths
+            try:
+                if os.path.isabs(content_str):
+                    abs_path = content_str
+                else:
+                    # Relative path, make it relative to the caller's file
+                    caller_dir = os.path.dirname(_get_caller_path())
+                    abs_path = os.path.abspath(os.path.join(caller_dir, content_str))
+
+                if not os.path.exists(abs_path):
+                    raise ValueError(f"File does not exist: {abs_path}")
+
+                with open(abs_path) as f:
+                    return f.read(), abs_path
+            except Exception as e:
+                _LOGGER.error(f"Failed to load file '{content_str}': {e}")
+                raise
+
+        # For strings, we need to determine if it's a file path or content
+        if isinstance(content, str):
+            # Criteria for being treated as a path:
+            # 1. Starts with ./, /, \ or contains path separators
+            # 2. AND doesn't contain any HTML-like tags
+            # 3. AND doesn't look like CSS content (e.g., doesn't contain { or })
+            is_likely_path = (
+                (
+                    content.strip().startswith(("./", "/", "\\"))
+                    or (os.path.sep in content and not content.strip().startswith("."))
+                )  # Avoid treating CSS classes as paths
+                and "<" not in content
+                and ">" not in content
+                and "{" not in content
+                and "}" not in content
+            )
+
+            if is_likely_path:
+                try:
+                    if os.path.isabs(content):
+                        abs_path = content
+                    else:
+                        # Relative path, make it relative to the caller's file
+                        caller_dir = os.path.dirname(_get_caller_path())
+                        abs_path = os.path.abspath(os.path.join(caller_dir, content))
+
+                    if not os.path.exists(abs_path):
+                        raise ValueError(f"File does not exist: {abs_path}")
+
+                    with open(abs_path) as f:
+                        return f.read(), abs_path
+                except Exception as e:
+                    _LOGGER.error(f"Failed to load file '{content}': {e}")
+                    raise
+
+        # If we get here, treat it as content
+        return content, None
 
     @property
     def html_content(self) -> str | None:
@@ -146,6 +234,11 @@ class BidiComponentDefinition:
     def js_content(self) -> str | None:
         """Return the processed JavaScript content."""
         return self._processed_js
+
+    @property
+    def source_paths(self) -> dict[str, str]:
+        """Return the source file directories for content loaded from files."""
+        return self._source_paths
 
 
 class BidiComponentRegistry:
@@ -229,3 +322,31 @@ class BidiComponentRegistry:
         with self._lock:
             self._components.clear()
             _LOGGER.debug("Cleared all components from registry")
+
+    def get_component_path(self, name: str) -> str | None:
+        """Return the filesystem path for the component with the given name.
+
+        If no such component is registered, or if the component exists but doesn't
+        have any content loaded from files, return None instead.
+
+        Parameters
+        ----------
+        name : str
+            The name of the component to retrieve the path for.
+
+        Returns
+        -------
+        str or None
+            The component's source directory if any content was loaded from files,
+            otherwise None.
+        """
+        component = self.get(name)
+        if component is None or not component.source_paths:
+            return None
+
+        # If we have multiple source paths, prefer js, then css
+        for source_type in ["js", "css"]:
+            if source_type in component.source_paths:
+                return component.source_paths[source_type]
+
+        return None
