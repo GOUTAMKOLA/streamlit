@@ -87,11 +87,13 @@ const useHandleJsContent = ({
   id,
   parentRef,
   skip = false,
+  data,
 }: {
   jsContent: string
   id: string
   parentRef: React.RefObject<HTMLDivElement | ShadowRoot | null>
   skip?: boolean
+  data: string | undefined
 }): void => {
   const componentId = `st-bidi-component-${useId()}`
 
@@ -118,7 +120,7 @@ const useHandleJsContent = ({
         if (module.default && typeof module.default === "function") {
           const result = module.default({
             name: "",
-            data: null,
+            data: data ? JSON.parse(data) : null,
             key: componentId,
             parentElement: parentRef.current,
             childContainerIDs: [],
@@ -169,7 +171,8 @@ const IsolatedComponent: FC<{
   jsContent: string
   htmlContent: string
   cssContent: string
-}> = ({ id, jsContent, htmlContent: html, cssContent }) => {
+  data: string | undefined
+}> = ({ id, jsContent, htmlContent: html, cssContent, data }) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const shadowRootRef = useRef<ShadowRoot | null>(null)
   const [isShadowRootReady, setIsShadowRootReady] = React.useState(false)
@@ -212,6 +215,7 @@ const IsolatedComponent: FC<{
     id,
     parentRef: shadowRootRef,
     skip: !isShadowRootReady,
+    data,
   })
 
   return <div ref={containerRef} data-testid="stBidiComponent-isolated" />
@@ -222,7 +226,8 @@ const NonIsolatedComponent: FC<{
   jsContent: string
   htmlContent: string
   cssContent: string
-}> = ({ id, jsContent, htmlContent: html, cssContent }) => {
+  data: string | undefined
+}> = ({ id, jsContent, htmlContent: html, cssContent, data }) => {
   const containerRef = useRef<HTMLDivElement>(null)
 
   useHandleHtmlAndCssContent({
@@ -236,6 +241,7 @@ const NonIsolatedComponent: FC<{
     jsContent,
     id,
     parentRef: containerRef,
+    data,
   })
 
   return <div ref={containerRef} data-testid="stBidiComponent-regular" />
@@ -257,7 +263,7 @@ const useProcessBidiElement = (
 }
 
 const BidiComponent: FC<BidiComponentProps> = ({ element }) => {
-  const { id, jsContent, isolateStyles } = element
+  const { data, id, jsContent, isolateStyles } = element
 
   const { html, css } = useProcessBidiElement(element)
 
@@ -265,6 +271,7 @@ const BidiComponent: FC<BidiComponentProps> = ({ element }) => {
   return isolateStyles ? (
     <IsolatedComponent
       cssContent={css}
+      data={data}
       htmlContent={html}
       id={id}
       jsContent={jsContent}
@@ -272,6 +279,7 @@ const BidiComponent: FC<BidiComponentProps> = ({ element }) => {
   ) : (
     <NonIsolatedComponent
       cssContent={css}
+      data={data}
       htmlContent={html}
       id={id}
       jsContent={jsContent}

@@ -116,6 +116,8 @@ class BidiComponentMixin:
         default: Any = None,
         on_change: WidgetCallback | None = None,
         child_container_count: int = 0,
+        # TODO: This needs to have a better type + support Arrow
+        data: Any | None = None,
         **kwargs,
     ) -> BidiComponentState:
         """Add a bidirectional component instance to the app using a registered component.
@@ -171,19 +173,25 @@ class BidiComponentMixin:
         if component_def is None:
             raise ValueError(f"Component '{component_name}' is not registered")
 
-        # Create a data payload with args and kwargs
-        data = {}
-        if args:
-            data["args"] = args
-        if kwargs:
-            data["kwargs"] = kwargs
-
         # Compute a unique ID for this component instance
         computed_id = compute_and_register_element_id(
             component_name,
             user_key=key,
             form_id=current_form_id(self.dg),
         )
+
+        # if is_bytes_like(arg_val):
+        #     bytes_arg = SpecialArg()
+        #     bytes_arg.key = arg_name
+        #     bytes_arg.bytes = to_bytes(arg_val)
+        #     special_args.append(bytes_arg)
+        # elif is_dataframe_like(arg_val):
+        #     dataframe_arg = SpecialArg()
+        #     dataframe_arg.key = arg_name
+        #     component_arrow.marshall(dataframe_arg.arrow_dataframe.data, arg_val)
+        #     special_args.append(dataframe_arg)
+        # else:
+        #     json_args[arg_name] = arg_val
 
         # Set up the component proto
         bidi_component_proto = BidiComponentProto()

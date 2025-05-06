@@ -19,6 +19,16 @@ syntax = "proto3";
 option java_package = "com.snowflake.apps.streamlit";
 option java_outer_classname = "BidiComponentProto";
 
+// TODO: Support dataframes via Arrow
+message BidiComponentData {
+  string key = 1;
+
+  oneof value {
+    Arrow arrow = 2;
+    bytes bytes = 3;
+  }
+}
+
 // Represents an instance of a bidirectional component.
 message BidiComponent {
     // The ID of the widget instance.
@@ -37,6 +47,10 @@ message BidiComponent {
     bool isolate_styles = 7;
     // The JSON value of the component's state.
     string data = 8;
+    // TODO: Support dataframes via Arrow
+    // Additional, non-JSON args. These require special processing
+    // on the other end.
+    // repeated BidiComponentData special_args = 9;
     // The number of child containers this component has.
     int32 child_container_count = 9;
 }

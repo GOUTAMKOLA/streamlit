@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import random
+from typing import Any
 
 import streamlit as st
 
@@ -62,7 +63,7 @@ if "isolate_styles" not in st.session_state:
     st.session_state.isolate_styles = True
 
 
-def my_component(*, key: str | None = None, data: str | None = None):
+def my_component(*, key: str | None = None, data: Any | None = None):
     # Get a callable function that renders the component
     render_component = st.components.v2.component(
         # For demo purposes, we'll use a random name to avoid collisions
@@ -110,5 +111,6 @@ with st.form("bidi_editor", clear_on_submit=False):
 
 st.write("## Component Instances")
 # Display the components - these will update when the form is submitted
-my_component(data="Some data from python")
+# my_component()
+my_component(data={"label": "Some data from python"})
 # my_component(key="my_component_2")
