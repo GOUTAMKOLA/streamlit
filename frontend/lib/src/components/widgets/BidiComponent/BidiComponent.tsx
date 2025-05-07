@@ -22,6 +22,11 @@ import { BidiComponent as BidiComponentProto } from "@streamlit/protobuf"
 
 const LOG = getLogger("BidiComponent")
 
+const getUrlForSourcePath = (sourcePath: string): string => {
+  // TODO: Make this dynamic to support SiS usecases
+  return `bidi_components/${sourcePath}`
+}
+
 export type BidiComponentProps = {
   element: BidiComponentProto
 }
@@ -32,12 +37,14 @@ const useHandleHtmlAndCssContent = ({
   cssContent,
   isShadowRoot,
   skip = false,
+  cssSourcePath,
 }: {
   containerRef: React.RefObject<HTMLDivElement>
-  html: string
-  cssContent: string
+  html: string | undefined
+  cssContent: string | undefined
   isShadowRoot: boolean
   skip?: boolean
+  cssSourcePath: string | undefined
 }): React.MutableRefObject<HTMLDivElement | null> => {
   const contentRef = useRef<HTMLDivElement | null>(null)
 
@@ -74,10 +81,15 @@ const useHandleHtmlAndCssContent = ({
       const styleElement = document.createElement("style")
       styleElement.textContent = cssContent
       contentRef.current.appendChild(styleElement)
+    } else if (cssSourcePath) {
+      const linkElement = document.createElement("link")
+      linkElement.href = getUrlForSourcePath(cssSourcePath)
+      linkElement.rel = "stylesheet"
+      contentRef.current.appendChild(linkElement)
     }
 
     parent.appendChild(contentRef.current)
-  }, [html, cssContent, containerRef, isShadowRoot, skip])
+  }, [html, cssContent, containerRef, isShadowRoot, skip, cssSourcePath])
 
   return contentRef
 }
@@ -88,12 +100,14 @@ const useHandleJsContent = ({
   parentRef,
   skip = false,
   data,
+  jsSourcePath,
 }: {
-  jsContent: string
+  jsContent: string | undefined
   id: string
   parentRef: React.RefObject<HTMLDivElement | ShadowRoot | null>
   skip?: boolean
   data: string | undefined
+  jsSourcePath: string | undefined
 }): void => {
   const componentId = `st-bidi-component-${useId()}`
 
@@ -164,15 +178,35 @@ const useHandleJsContent = ({
     // eslint-disable-next-line react-compiler/react-compiler
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [skip])
+
+  useEffect(() => {
+    if (skip || !jsSourcePath) {
+      return
+    }
+
+    const scriptElement = document.createElement("script")
+    scriptElement.src = getUrlForSourcePath(jsSourcePath)
+    document.head.appendChild(scriptElement)
+  }, [jsSourcePath, skip])
 }
 
 const IsolatedComponent: FC<{
   id: string
-  jsContent: string
-  htmlContent: string
-  cssContent: string
+  jsContent: string | undefined
+  htmlContent: string | undefined
+  cssContent: string | undefined
   data: string | undefined
-}> = ({ id, jsContent, htmlContent: html, cssContent, data }) => {
+  jsSourcePath: string | undefined
+  cssSourcePath: string | undefined
+}> = ({
+  id,
+  jsContent,
+  htmlContent: html,
+  cssContent,
+  data,
+  jsSourcePath,
+  cssSourcePath,
+}) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const shadowRootRef = useRef<ShadowRoot | null>(null)
   const [isShadowRootReady, setIsShadowRootReady] = React.useState(false)
@@ -204,44 +238,58 @@ const IsolatedComponent: FC<{
 
   useHandleHtmlAndCssContent({
     containerRef,
-    html,
     cssContent,
+    cssSourcePath,
+    html,
     isShadowRoot: true,
     skip: !isShadowRootReady,
   })
 
   useHandleJsContent({
-    jsContent,
+    data,
     id,
+    jsContent,
+    jsSourcePath,
     parentRef: shadowRootRef,
     skip: !isShadowRootReady,
-    data,
   })
 
   return <div ref={containerRef} data-testid="stBidiComponent-isolated" />
 }
 
 const NonIsolatedComponent: FC<{
-  id: string
-  jsContent: string
-  htmlContent: string
-  cssContent: string
+  cssContent: string | undefined
+  cssSourcePath: string | undefined
   data: string | undefined
-}> = ({ id, jsContent, htmlContent: html, cssContent, data }) => {
+  htmlContent: string | undefined
+  id: string
+  jsContent: string | undefined
+  jsSourcePath: string | undefined
+}> = ({
+  cssContent,
+  cssSourcePath,
+  data,
+  htmlContent: html,
+  id,
+  jsContent,
+  jsSourcePath,
+}) => {
   const containerRef = useRef<HTMLDivElement>(null)
 
   useHandleHtmlAndCssContent({
     containerRef,
-    html,
     cssContent,
+    cssSourcePath,
+    html,
     isShadowRoot: false,
   })
 
   useHandleJsContent({
-    jsContent,
-    id,
-    parentRef: containerRef,
     data,
+    id,
+    jsContent,
+    jsSourcePath,
+    parentRef: containerRef,
   })
 
   return <div ref={containerRef} data-testid="stBidiComponent-regular" />
@@ -249,12 +297,11 @@ const NonIsolatedComponent: FC<{
 
 const useProcessBidiElement = (
   element: BidiComponentProto
-): { html: string; css: string } => {
+): { html: string | undefined; css: string | undefined } => {
   const { htmlContent, cssContent } = element
 
-  const userHtmlContent = useMemo(() => htmlContent.trim(), [htmlContent])
-
-  const userCssContent = useMemo(() => cssContent.trim(), [cssContent])
+  const userHtmlContent = useMemo(() => htmlContent?.trim(), [htmlContent])
+  const userCssContent = useMemo(() => cssContent?.trim(), [cssContent])
 
   return {
     html: userHtmlContent,
@@ -263,7 +310,8 @@ const useProcessBidiElement = (
 }
 
 const BidiComponent: FC<BidiComponentProps> = ({ element }) => {
-  const { data, id, jsContent, isolateStyles } = element
+  const { cssSourcePath, data, id, isolateStyles, jsContent, jsSourcePath } =
+    element
 
   const { html, css } = useProcessBidiElement(element)
 
@@ -271,18 +319,22 @@ const BidiComponent: FC<BidiComponentProps> = ({ element }) => {
   return isolateStyles ? (
     <IsolatedComponent
       cssContent={css}
+      cssSourcePath={cssSourcePath ?? undefined}
       data={data}
       htmlContent={html}
       id={id}
-      jsContent={jsContent}
+      jsContent={jsContent ?? undefined}
+      jsSourcePath={jsSourcePath ?? undefined}
     />
   ) : (
     <NonIsolatedComponent
       cssContent={css}
+      cssSourcePath={cssSourcePath ?? undefined}
       data={data}
       htmlContent={html}
       id={id}
-      jsContent={jsContent}
+      jsContent={jsContent ?? undefined}
+      jsSourcePath={jsSourcePath ?? undefined}
     />
   )
 }

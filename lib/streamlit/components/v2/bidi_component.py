@@ -193,13 +193,18 @@ class BidiComponentMixin:
         # else:
         #     json_args[arg_name] = arg_val
 
+        # TODO: Add arg checking to ensure we have
+        # - (JS content or JS source path) OR (HTML content) OR BOTH
+
         # Set up the component proto
         bidi_component_proto = BidiComponentProto()
         bidi_component_proto.id = computed_id
         bidi_component_proto.component_name = component_name
         bidi_component_proto.js_content = component_def.js_content or ""
+        bidi_component_proto.js_source_path = component_def.js_url or ""
         bidi_component_proto.html_content = component_def.html_content or ""
         bidi_component_proto.css_content = component_def.css_content or ""
+        bidi_component_proto.css_source_path = component_def.css_url or ""
         bidi_component_proto.isolate_styles = component_def.isolate_styles
         # TODO: Support dataframes via Arrow
         bidi_component_proto.data = json.dumps(data) if data else ""

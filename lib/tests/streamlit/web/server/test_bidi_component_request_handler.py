@@ -79,7 +79,7 @@ class BidiComponentRequestHandlerTest(tornado.testing.AsyncHTTPTestCase):
         return tornado.web.Application(
             [
                 (
-                    r"/bidi_component/(.*)",
+                    r"/bidi_components/(.*)",
                     BidiComponentRequestHandler,
                     {"registry": self.registry},
                 )
@@ -87,12 +87,12 @@ class BidiComponentRequestHandlerTest(tornado.testing.AsyncHTTPTestCase):
         )
 
     def test_get_component_file(self) -> None:
-        response = self.fetch("/bidi_component/test_component/index.js")
+        response = self.fetch("/bidi_components/test_component/index.js")
         self.assertEqual(response.code, 200)
         self.assertEqual(response.body.decode(), "console.log('test component');")
 
     def test_component_not_found(self) -> None:
-        response = self.fetch("/bidi_component/nonexistent_component/index.js")
+        response = self.fetch("/bidi_components/nonexistent_component/index.js")
         self.assertEqual(response.code, 404)
 
     def test_component_path_not_found(self) -> None:
@@ -103,7 +103,7 @@ class BidiComponentRequestHandlerTest(tornado.testing.AsyncHTTPTestCase):
                 js="console.log('no path');",
             )
         )
-        response = self.fetch("/bidi_component/no_path_component/index.js")
+        response = self.fetch("/bidi_components/no_path_component/index.js")
         self.assertEqual(response.code, 404)
 
     def test_multiple_file_components(self) -> None:
@@ -119,27 +119,27 @@ class BidiComponentRequestHandlerTest(tornado.testing.AsyncHTTPTestCase):
         )
 
         # JS should be accessible
-        response = self.fetch("/bidi_component/multi_file_component/index.js")
+        response = self.fetch("/bidi_components/multi_file_component/index.js")
         self.assertEqual(response.code, 200)
         self.assertEqual(response.body.decode(), "console.log('test component');")
 
         # HTML files should NOT be accessible through the file handler
         # since HTML is only accepted as a string
-        response = self.fetch("/bidi_component/multi_file_component/index.html")
+        response = self.fetch("/bidi_components/multi_file_component/index.html")
         self.assertEqual(response.code, 404)
 
         # CSS should be accessible
-        response = self.fetch("/bidi_component/multi_file_component/styles.css")
+        response = self.fetch("/bidi_components/multi_file_component/styles.css")
         self.assertEqual(response.code, 200)
         self.assertEqual(response.body.decode(), "div { color: red; }")
 
     def test_disallow_path_traversal(self) -> None:
         # Attempt path traversal attack
-        response = self.fetch("/bidi_component/test_component/../../../etc/passwd")
+        response = self.fetch("/bidi_components/test_component/../../../etc/passwd")
         self.assertEqual(response.code, 403)
 
     def test_file_not_found_in_component_dir(self) -> None:
-        response = self.fetch("/bidi_component/test_component/nonexistent.js")
+        response = self.fetch("/bidi_components/test_component/nonexistent.js")
         self.assertEqual(response.code, 404)
 
     def test_get_url(self) -> None:

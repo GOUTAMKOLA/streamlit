@@ -52,42 +52,6 @@ def _get_caller_path() -> str:
     return file_path
 
 
-def _load_content_from_file(file_path: str) -> str:
-    """Load content from a file path, which can be relative to the caller."""
-    if os.path.isabs(file_path):
-        # Absolute path, use it directly
-        abs_path = file_path
-    else:
-        # Relative path, make it relative to the caller's file
-        caller_dir = os.path.dirname(_get_caller_path())
-        abs_path = os.path.abspath(os.path.join(caller_dir, file_path))
-
-    if not os.path.exists(abs_path):
-        raise ValueError(f"File does not exist: {abs_path}")
-
-    with open(abs_path) as f:
-        return f.read()
-
-
-def _process_content(content: str | Path | None) -> str | None:
-    """Process content which could be a string or file path."""
-    if content is None:
-        return None
-
-    if isinstance(content, Path):
-        content = str(content)
-
-    if content.strip().startswith((".", "/", "\\")) or os.path.sep in content:
-        # This looks like a file path
-        try:
-            return _load_content_from_file(content)
-        except Exception as e:
-            _LOGGER.error(f"Failed to load file '{content}': {e}")
-            raise
-    # This is the actual content
-    return content
-
-
 @dataclass(frozen=True)
 class BidiComponentDefinition:
     """Definition of a bidirectional component V2.
@@ -111,56 +75,45 @@ class BidiComponentDefinition:
     css: str | Path | None = None
     js: str | Path | None = None
     isolate_styles: bool = True
-    # Process the content and store it in these private fields
-    _processed_html: str | None = field(default=None, init=False, repr=False)
-    _processed_css: str | None = field(default=None, init=False, repr=False)
-    _processed_js: str | None = field(default=None, init=False, repr=False)
+    # Store processed content and metadata
+    _is_css_path: bool = field(default=False, init=False, repr=False)
+    _is_js_path: bool = field(default=False, init=False, repr=False)
     _source_paths: dict[str, str] = field(default_factory=dict, init=False, repr=False)
 
     def __post_init__(self):
         # Keep track of source paths for content loaded from files
         source_paths = {}
 
-        # Process and store the content
-        # HTML is always treated as a string, not a file path
-        object.__setattr__(self, "_processed_html", self.html)
-
-        # CSS and JS can be either strings or file paths
-        css_content, css_path = self._process_as_content_or_path(self.css)
-        js_content, js_path = self._process_as_content_or_path(self.js)
+        # Store CSS and JS paths if provided
+        is_css_path, css_path = self._is_file_path(self.css)
+        is_js_path, js_path = self._is_file_path(self.js)
 
         if css_path:
             source_paths["css"] = os.path.dirname(css_path)
         if js_path:
             source_paths["js"] = os.path.dirname(js_path)
 
-        object.__setattr__(self, "_processed_css", css_content)
-        object.__setattr__(self, "_processed_js", js_content)
+        object.__setattr__(self, "_is_css_path", is_css_path)
+        object.__setattr__(self, "_is_js_path", is_js_path)
         object.__setattr__(self, "_source_paths", source_paths)
 
         # Validate that at least one content type is provided
-        if (
-            not self._processed_html
-            and not self._processed_js
-            and not self._processed_css
-        ):
+        if not self.html and not self.js and not self.css:
             raise ValueError(
                 "BidiComponentDefinition must have at least one of html, css, or js."
             )
 
-    def _process_as_content_or_path(
-        self, content: str | Path | None
-    ) -> tuple[str | None, str | None]:
-        """Process content which could be a string or file path.
+    def _is_file_path(self, content: str | Path | None) -> tuple[bool, str | None]:
+        """Determine if the content is a file path.
 
         Returns
         -------
-            A tuple (content, source_path) where:
-            - content: The loaded content string if input is a path, or the original string
-            - source_path: The absolute path to the source file if input is a path, or None
+            A tuple (is_path, path) where:
+            - is_path: True if the content is a file path
+            - path: The absolute path to the file if content is a path, otherwise None
         """
         if content is None:
-            return None, None
+            return False, None
 
         if isinstance(content, Path):
             content_str = str(content)
@@ -172,14 +125,14 @@ class BidiComponentDefinition:
                     # Relative path, make it relative to the caller's file
                     caller_dir = os.path.dirname(_get_caller_path())
                     abs_path = os.path.abspath(os.path.join(caller_dir, content_str))
+                    print(f"abs_path: {abs_path}")
 
                 if not os.path.exists(abs_path):
                     raise ValueError(f"File does not exist: {abs_path}")
 
-                with open(abs_path) as f:
-                    return f.read(), abs_path
+                return True, abs_path
             except Exception as e:
-                _LOGGER.error(f"Failed to load file '{content_str}': {e}")
+                _LOGGER.error(f"Failed to process file path '{content_str}': {e}")
                 raise
 
         # For strings, we need to determine if it's a file path or content
@@ -211,29 +164,64 @@ class BidiComponentDefinition:
                     if not os.path.exists(abs_path):
                         raise ValueError(f"File does not exist: {abs_path}")
 
-                    with open(abs_path) as f:
-                        return f.read(), abs_path
+                    return True, abs_path
                 except Exception as e:
-                    _LOGGER.error(f"Failed to load file '{content}': {e}")
+                    _LOGGER.error(f"Failed to process file path '{content}': {e}")
                     raise
 
-        # If we get here, treat it as content
-        return content, None
+        # If we get here, it's content, not a path
+        return False, None
 
     @property
-    def html_content(self) -> str | None:
-        """Return the processed HTML content."""
-        return self._processed_html
+    def css_url(self) -> str | None:
+        """Return the URL to the CSS file if it's a path, otherwise None."""
+        if not self._is_css_path:
+            return None
+
+        # If it's a path, get the filename
+        if isinstance(self.css, Path):
+            filename = self.css.name
+        else:
+            # It's a string path
+            filename = os.path.basename(str(self.css))
+
+        return f"{self.name}/{filename}"
+
+    @property
+    def js_url(self) -> str | None:
+        """Return the URL to the JS file if it's a path, otherwise None."""
+        if not self._is_js_path:
+            return None
+
+        # If it's a path, get the filename
+        if isinstance(self.js, Path):
+            filename = self.js.name
+        else:
+            # It's a string path
+            filename = os.path.basename(str(self.js))
+
+        return f"{self.name}/{filename}"
 
     @property
     def css_content(self) -> str | None:
-        """Return the processed CSS content."""
-        return self._processed_css
+        """Return the CSS content if it's inline content, otherwise None."""
+        if self._is_css_path or self.css is None:
+            return None
+        # Return as string if it's not a path
+        return str(self.css)
 
     @property
     def js_content(self) -> str | None:
-        """Return the processed JavaScript content."""
-        return self._processed_js
+        """Return the JS content if it's inline content, otherwise None."""
+        if self._is_js_path or self.js is None:
+            return None
+        # Return as string if it's not a path
+        return str(self.js)
+
+    @property
+    def html_content(self) -> str | None:
+        """Return the HTML content."""
+        return self.html
 
     @property
     def source_paths(self) -> dict[str, str]:

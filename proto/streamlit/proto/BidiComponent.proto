@@ -38,21 +38,25 @@ message BidiComponent {
     // The registered name of the component.
     string component_name = 2;
     // The JavaScript content provided by the developer.
-    string js_content = 3;
+    optional string js_content = 3;
+    // The source path for the JavaScript content.
+    optional string js_source_path = 4;
     // The ID of the form this component belongs to, if any.
-    string form_id = 4;
+    string form_id = 5;
     // The HTML content provided by the developer.
-    string html_content = 5;
+    optional string html_content = 6;
     // The CSS content provided by the developer.
-    string css_content = 6;
+    optional string css_content = 7;
+    // The source path for the CSS content.
+    optional string css_source_path = 8;
     // Whether to isolate styles from the parent.
-    bool isolate_styles = 7;
+    bool isolate_styles = 9;
     // The JSON value of the component's state.
-    string data = 8;
+    string data = 10;
     // TODO: Support dataframes via Arrow
     // Additional, non-JSON args. These require special processing
     // on the other end.
     // repeated BidiComponentData special_args = 9;
     // The number of child containers this component has.
-    int32 child_container_count = 9;
+    int32 child_container_count = 11;
 }
