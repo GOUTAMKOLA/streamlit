@@ -97,6 +97,53 @@ const useHandleHtmlAndCssContent = ({
   return contentRef
 }
 
+const importAndRunModule = async ({
+  moduleUrl,
+  id,
+  parentRef,
+  data,
+  componentId,
+  widgetMgr,
+  onError,
+}: {
+  moduleUrl: string
+  id: string
+  parentRef: React.RefObject<HTMLDivElement | ShadowRoot | null>
+  data: string | undefined
+  componentId: string
+  widgetMgr: WidgetStateManager
+  onError: (error: unknown) => void
+}): Promise<() => void | undefined> => {
+  try {
+    const module = await import(/* @vite-ignore */ moduleUrl)
+    if (
+      module.default &&
+      typeof module.default === "function" &&
+      parentRef.current
+    ) {
+      const result = module.default({
+        name: "",
+        data: data ? JSON.parse(data) : null,
+        key: componentId,
+        parentElement: parentRef.current,
+        childContainerIDs: [],
+        onChange: (value: unknown) => {
+          widgetMgr.setJsonValue({ id }, value, { fromUi: true }, undefined)
+        },
+      })
+      if (typeof result === "function") {
+        return result
+      }
+    } else {
+      onError("Module does not have a default export function.")
+    }
+  } catch (error) {
+    onError(error)
+  }
+
+  return () => {}
+}
+
 const useHandleJsContent = ({
   jsContent,
   id,
@@ -117,64 +164,70 @@ const useHandleJsContent = ({
   const componentId = `st-bidi-component-${useId()}`
 
   useEffect(() => {
-    if (skip || !jsContent || !parentRef.current) {
+    if (skip || (!jsContent && !jsSourcePath) || !parentRef.current) {
       return
     }
 
     let isMounted = true
     let cleanup: (() => void) | undefined
+    let scriptElement: HTMLScriptElement | undefined
 
-    const dataUri = `data:text/javascript;charset=utf-8,${encodeURIComponent(
-      jsContent
-    )}`
-
-    const handleImport = async (): Promise<void> => {
-      try {
-        const module = await import(/* @vite-ignore */ dataUri)
-
-        if (!isMounted || !parentRef.current) {
-          return
-        }
-
-        if (module.default && typeof module.default === "function") {
-          const result = module.default({
-            name: "",
-            data: data ? JSON.parse(data) : null,
-            key: componentId,
-            parentElement: parentRef.current,
-            childContainerIDs: [],
-            onChange: (value: unknown) => {
-              // This sends the value to the backend, which will trigger on_change callback
-              widgetMgr.setJsonValue(
-                { id },
-                value,
-                { fromUi: true },
-                // TODO: Support fragment IDs
-                undefined
-              )
-            },
-          })
-
-          if (typeof result === "function") {
-            cleanup = result
-          }
-        } else {
-          LOG.error(
-            "BidiComponent Error: Module does not have a default export function.",
-            id
-          )
-        }
-      } catch (error) {
-        if (isMounted) {
-          LOG.error(
-            `BidiComponent Error: Failed to load or execute script for element ${id}`,
-            error
-          )
-        }
+    const onError = (error: unknown) => {
+      if (isMounted) {
+        LOG.error(
+          `BidiComponent Error: Failed to load or execute script for element ${id}`,
+          error
+        )
       }
     }
 
-    handleImport()
+    const run = async () => {
+      try {
+        if (jsContent) {
+          const dataUri = `data:text/javascript;charset=utf-8,${encodeURIComponent(
+            jsContent
+          )}`
+
+          cleanup = await importAndRunModule({
+            moduleUrl: dataUri,
+            id,
+            parentRef,
+            data,
+            componentId,
+            widgetMgr,
+            onError,
+          })
+        } else if (jsSourcePath) {
+          const scriptUrl = getUrlForSourcePath(jsSourcePath)
+          scriptElement = document.createElement("script")
+          scriptElement.type = "module"
+          scriptElement.src = scriptUrl
+          scriptElement.async = true
+
+          // Wait for script to load or error
+          await new Promise<void>((resolve, reject) => {
+            scriptElement!.onload = () => resolve()
+            scriptElement!.onerror = () =>
+              reject(new Error("Script load error"))
+            document.head.appendChild(scriptElement!)
+          })
+
+          cleanup = await importAndRunModule({
+            moduleUrl: scriptUrl,
+            id,
+            parentRef,
+            data,
+            componentId,
+            widgetMgr,
+            onError,
+          })
+        }
+      } catch (error) {
+        onError(error)
+      }
+    }
+
+    run()
 
     return () => {
       isMounted = false
@@ -188,91 +241,10 @@ const useHandleJsContent = ({
           )
         }
       }
-    }
-    // NOTE: Intentionally only running on mount to achieve product behavior
-    // eslint-disable-next-line react-compiler/react-compiler
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [skip])
-
-  useEffect(() => {
-    if (skip || !jsSourcePath) {
-      return
-    }
-
-    let isMounted = true
-    let cleanup: (() => void) | undefined
-
-    const scriptUrl = getUrlForSourcePath(jsSourcePath)
-    const scriptElement = document.createElement("script")
-    scriptElement.type = "module"
-    scriptElement.src = scriptUrl
-    scriptElement.async = true
-
-    const handleModule = async (): Promise<void> => {
-      try {
-        // Wait for the script to load
-        await new Promise<void>((resolve, reject) => {
-          scriptElement.onload = () => resolve()
-          scriptElement.onerror = () => reject()
-        })
-        // Now import as module
-        const module = await import(/* @vite-ignore */ scriptUrl)
-        if (!isMounted || !parentRef.current) {
-          return
-        }
-        if (module.default && typeof module.default === "function") {
-          const result = module.default({
-            name: "",
-            data: data ? JSON.parse(data) : null,
-            key: componentId,
-            parentElement: parentRef.current,
-            childContainerIDs: [],
-            onChange: (value: unknown) => {
-              widgetMgr.setJsonValue(
-                { id },
-                value,
-                { fromUi: true },
-                undefined
-              )
-            },
-          })
-          if (typeof result === "function") {
-            cleanup = result
-          }
-        } else {
-          LOG.error(
-            "BidiComponent Error: Module does not have a default export function.",
-            id
-          )
-        }
-      } catch (error) {
-        if (isMounted) {
-          LOG.error(
-            `BidiComponent Error: Failed to load or execute script for element ${id}`,
-            error
-          )
-        }
+      if (scriptElement && scriptElement.parentNode) {
+        scriptElement.parentNode.removeChild(scriptElement)
       }
     }
-
-    document.head.appendChild(scriptElement)
-    handleModule()
-
-    return () => {
-      isMounted = false
-      if (cleanup) {
-        try {
-          cleanup()
-        } catch (error) {
-          LOG.error(
-            `BidiComponent Error: Failed to run cleanup for element ${id}`,
-            error
-          )
-        }
-      }
-      document.head.removeChild(scriptElement)
-    }
-    // NOTE: Intentionally only running on mount to achieve product behavior
     // eslint-disable-next-line react-compiler/react-compiler
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [skip])
