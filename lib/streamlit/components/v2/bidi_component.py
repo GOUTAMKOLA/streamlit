@@ -63,28 +63,25 @@ class BidiComponentSerde:
     Assumes communication via JSON strings.
     """
 
-    # Store the default value for deserialization fallback
-    default_value: Any = None
-
-    def deserialize(
-        self,
-        ui_value: str | None,
-        widget_id: str = "",
-    ) -> BidiComponentState:
+    def deserialize(self, ui_value: str | dict | None) -> BidiComponentState:
         """Deserialize the state from the frontend.
 
         Args:
             ui_value: The JSON string received from the frontend.
-            widget_id: The widget ID (unused here).
 
         Returns
         -------
             The deserialized state wrapped in an AttributeDictionary.
         """
         try:
-            deserialized_value = json.loads(ui_value) if ui_value is not None else None
+            if isinstance(ui_value, dict):
+                deserialized_value = ui_value
+            elif ui_value is not None:
+                deserialized_value = json.loads(ui_value)
+            else:
+                deserialized_value = None
         except Exception:
-            deserialized_value = self.default_value
+            deserialized_value = None
 
         state: BidiComponentState = {"value": deserialized_value}
         return cast("BidiComponentState", AttributeDictionary(state))
@@ -212,14 +209,14 @@ class BidiComponentMixin:
         bidi_component_proto.form_id = current_form_id(self.dg)
 
         # Instantiate the Serde for this component instance
-        serde = BidiComponentSerde(default_value=default)
+        serde = BidiComponentSerde()
 
         component_state = register_widget(
             bidi_component_proto.id,
             deserializer=serde.deserialize,
             serializer=serde.serialize,
             ctx=ctx,
-            on_change_handler=on_change,
+            on_change_handler=on_change if callable(on_change) else None,
             value_type="json_value",
         )
 

@@ -142,6 +142,7 @@ result = my_component(
     on_change=handle_change,
 )
 
+st.write(f"Result: {result}")
 st.write(f"Counter value: {st.session_state.value}")
 if st.session_state.last_callback_time:
     st.write(f"Last callback processed at: {st.session_state.last_callback_time}")
