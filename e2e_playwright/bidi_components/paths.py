@@ -27,8 +27,9 @@ def my_component_with_paths(
     # Get a callable function that renders the component
     render_component = st.components.v2.component(
         name="my_component",
-        html="<div>hello</div>",
-        js="export default function(component) {}",
+        html=html,
+        js=js,
+        css=css,
         key="my_component_1",
     )
 

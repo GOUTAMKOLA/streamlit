@@ -98,9 +98,6 @@ UNIX_SOCKET_PREFIX: Final = "unix://"
 # as the endpoints in frontend/connection/src/DefaultStreamlitEndpoints
 MEDIA_ENDPOINT: Final = "/media"
 COMPONENT_ENDPOINT: Final = "/component"
-# TODO: We do NOT want this to actually be a static path due to SiS
-# requirements. This is a temporary endpoint for development purposes, it will
-# need to be made dynamic in the future.
 BIDI_COMPONENT_ENDPOINT: Final = "/bidi_components"
 STATIC_SERVING_ENDPOINT: Final = "/app/static"
 UPLOAD_FILE_ENDPOINT: Final = "/_stcore/upload_file"

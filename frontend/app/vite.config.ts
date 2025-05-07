@@ -97,6 +97,10 @@ export default defineConfig({
         target: DEV_SERVER_BACKEND_URL,
         changeOrigin: true,
       },
+      "^.*/bidi_components/.*": {
+        target: DEV_SERVER_BACKEND_URL,
+        changeOrigin: true,
+      },
       "^.*/app/static/.*": {
         target: DEV_SERVER_BACKEND_URL,
         changeOrigin: true,

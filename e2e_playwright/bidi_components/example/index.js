@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-export default function Example(component) {
+export default function (component) {
   console.log("I am a bidi component", component);
 
   const { parentElement } = component;

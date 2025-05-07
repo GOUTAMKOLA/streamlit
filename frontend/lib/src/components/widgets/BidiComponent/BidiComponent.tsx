@@ -26,7 +26,7 @@ const LOG = getLogger("BidiComponent")
 
 const getUrlForSourcePath = (sourcePath: string): string => {
   // TODO: Make this dynamic to support SiS usecases
-  return `bidi_components/${sourcePath}`
+  return `/bidi_components/${sourcePath}`
 }
 
 export type BidiComponentProps = {
@@ -199,10 +199,83 @@ const useHandleJsContent = ({
       return
     }
 
+    let isMounted = true
+    let cleanup: (() => void) | undefined
+
+    const scriptUrl = getUrlForSourcePath(jsSourcePath)
     const scriptElement = document.createElement("script")
-    scriptElement.src = getUrlForSourcePath(jsSourcePath)
+    scriptElement.type = "module"
+    scriptElement.src = scriptUrl
+    scriptElement.async = true
+
+    const handleModule = async (): Promise<void> => {
+      try {
+        // Wait for the script to load
+        await new Promise<void>((resolve, reject) => {
+          scriptElement.onload = () => resolve()
+          scriptElement.onerror = () => reject()
+        })
+        // Now import as module
+        const module = await import(/* @vite-ignore */ scriptUrl)
+        if (!isMounted || !parentRef.current) {
+          return
+        }
+        if (module.default && typeof module.default === "function") {
+          const result = module.default({
+            name: "",
+            data: data ? JSON.parse(data) : null,
+            key: componentId,
+            parentElement: parentRef.current,
+            childContainerIDs: [],
+            onChange: (value: unknown) => {
+              widgetMgr.setJsonValue(
+                { id },
+                value,
+                { fromUi: true },
+                undefined
+              )
+            },
+          })
+          if (typeof result === "function") {
+            cleanup = result
+          }
+        } else {
+          LOG.error(
+            "BidiComponent Error: Module does not have a default export function.",
+            id
+          )
+        }
+      } catch (error) {
+        if (isMounted) {
+          LOG.error(
+            `BidiComponent Error: Failed to load or execute script for element ${id}`,
+            error
+          )
+        }
+      }
+    }
+
     document.head.appendChild(scriptElement)
-  }, [jsSourcePath, skip])
+    handleModule()
+
+    return () => {
+      isMounted = false
+      if (cleanup) {
+        try {
+          cleanup()
+        } catch (error) {
+          LOG.error(
+            `BidiComponent Error: Failed to run cleanup for element ${id}`,
+            error
+          )
+        }
+      }
+      document.head.removeChild(scriptElement)
+    }
+    // NOTE: Intentionally only running on mount to achieve product behavior
+    // eslint-disable-next-line react-compiler/react-compiler
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [skip])
 }
 
 const IsolatedComponent: FC<{
