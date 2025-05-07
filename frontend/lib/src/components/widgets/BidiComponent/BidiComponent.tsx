@@ -25,7 +25,6 @@ import type { WidgetStateManager } from "src/WidgetStateManager"
 const LOG = getLogger("BidiComponent")
 
 const getUrlForSourcePath = (sourcePath: string): string => {
-  // TODO: Make this dynamic to support SiS usecases
   return `/bidi_components/${sourcePath}`
 }
 
@@ -38,29 +37,21 @@ const useHandleHtmlAndCssContent = ({
   containerRef,
   html,
   cssContent,
-  isShadowRoot,
   skip = false,
   cssSourcePath,
 }: {
-  containerRef: React.RefObject<HTMLDivElement>
+  containerRef: React.RefObject<HTMLElement | ShadowRoot>
   html: string | undefined
   cssContent: string | undefined
-  isShadowRoot: boolean
   skip?: boolean
   cssSourcePath: string | undefined
 }): React.MutableRefObject<HTMLDivElement | null> => {
   const contentRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
-    if (skip || !containerRef.current) {
-      return
-    }
+    const parent = containerRef.current
 
-    const parent = isShadowRoot
-      ? containerRef.current.shadowRoot
-      : containerRef.current
-
-    if (!parent) {
+    if (skip || !parent) {
       return
     }
 
@@ -92,7 +83,7 @@ const useHandleHtmlAndCssContent = ({
     }
 
     parent.appendChild(contentRef.current)
-  }, [html, cssContent, containerRef, isShadowRoot, skip, cssSourcePath])
+  }, [html, cssContent, containerRef, skip, cssSourcePath])
 
   return contentRef
 }
@@ -299,11 +290,10 @@ const IsolatedComponent: FC<{
   }, [id])
 
   useHandleHtmlAndCssContent({
-    containerRef,
+    containerRef: shadowRootRef,
     cssContent,
     cssSourcePath,
     html,
-    isShadowRoot: true,
     skip: !isShadowRootReady,
   })
 
@@ -346,7 +336,6 @@ const NonIsolatedComponent: FC<{
     cssContent,
     cssSourcePath,
     html,
-    isShadowRoot: false,
   })
 
   useHandleJsContent({
