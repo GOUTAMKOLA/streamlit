@@ -71,13 +71,8 @@ def my_component(
     data: Any | None = None,
     on_change: Callable | None = None,
 ):
-    print(f"my_component called with key={key}, on_change={on_change}")
     # Get a callable function that renders the component
     render_component = st.components.v2.component(
-        # For demo purposes, we'll use a random name to avoid collisions
-        # and to ensure that the component is re-created when the form is
-        # submitted.
-        # name=f"my_component-{random.randint(0, 1000000)}",
         name="my_component",
         js=st.session_state.js_code,
         html=st.session_state.html_code,
