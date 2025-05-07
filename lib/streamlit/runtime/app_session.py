@@ -26,6 +26,7 @@ from google.protobuf.json_format import ParseDict
 
 import streamlit.elements.exception as exception_utils
 from streamlit import config, env_util, runtime
+from streamlit.components.v2.component_registry import BidiComponentRegistry
 from streamlit.logger import get_logger
 from streamlit.proto.ClientState_pb2 import ClientState
 from streamlit.proto.Common_pb2 import FileURLs, FileURLsRequest
@@ -137,6 +138,7 @@ class AppSession:
         self._pages_manager = PagesManager(
             script_data.main_script_path, self._script_cache
         )
+        self._bidi_component_registry = BidiComponentRegistry()
 
         # The browser queue contains messages that haven't yet been
         # delivered to the browser. Periodically, the server flushes
@@ -452,6 +454,11 @@ class AppSession:
     @property
     def session_state(self) -> SessionState:
         return self._session_state
+
+    @property
+    def bidi_component_registry(self) -> BidiComponentRegistry:
+        """The AppSession's BidiComponentRegistry instance."""
+        return self._bidi_component_registry
 
     def _should_rerun_on_file_change(self, filepath: str) -> bool:
         pages = self._pages_manager.get_pages()

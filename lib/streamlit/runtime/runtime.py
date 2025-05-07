@@ -22,7 +22,6 @@ from enum import Enum
 from typing import TYPE_CHECKING, Final, NamedTuple
 
 from streamlit.components.lib.local_component_registry import LocalComponentRegistry
-from streamlit.components.v2.component_registry import BidiComponentRegistry
 from streamlit.logger import get_logger
 from streamlit.proto.ForwardMsg_pb2 import ForwardMsg
 from streamlit.runtime.app_session import AppSession
@@ -95,11 +94,6 @@ class RuntimeConfig:
     # The ComponentRegistry instance to use.
     component_registry: BaseComponentRegistry = field(
         default_factory=LocalComponentRegistry
-    )
-
-    # The BidiComponentRegistry instance to use for v2 components.
-    bidi_component_registry: BidiComponentRegistry = field(
-        default_factory=BidiComponentRegistry
     )
 
     # The SessionManager class to be used.
@@ -202,7 +196,6 @@ class Runtime:
 
         # Initialize managers
         self._component_registry = config.component_registry
-        self._bidi_component_registry = config.bidi_component_registry
         self._uploaded_file_mgr = config.uploaded_file_manager
         self._media_file_mgr = MediaFileManager(storage=config.media_file_storage)
         self._cache_storage_manager = config.cache_storage_manager
@@ -228,10 +221,6 @@ class Runtime:
     @property
     def component_registry(self) -> BaseComponentRegistry:
         return self._component_registry
-
-    @property
-    def bidi_component_registry(self) -> BidiComponentRegistry:
-        return self._bidi_component_registry
 
     @property
     def uploaded_file_mgr(self) -> UploadedFileManager:

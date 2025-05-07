@@ -165,9 +165,9 @@ class BidiComponentMixin:
             return cast("BidiComponentState", AttributeDictionary(state))
 
         # Get the component definition from the registry
-        from streamlit.runtime import Runtime
+        from streamlit.components.v2 import get_bidi_component_registry
 
-        registry = Runtime.instance().bidi_component_registry
+        registry = get_bidi_component_registry()
         component_def = registry.get(component_name)
 
         if component_def is None:

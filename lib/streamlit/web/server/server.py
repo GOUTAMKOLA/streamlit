@@ -31,6 +31,7 @@ from tornado.httpserver import HTTPServer
 
 from streamlit import cli_util, config, file_util, util
 from streamlit.auth_util import is_authlib_installed
+from streamlit.components.v2.component_registry import BidiComponentRegistry
 from streamlit.config_option import ConfigOption
 from streamlit.logger import get_logger
 from streamlit.runtime import Runtime, RuntimeConfig, RuntimeState
@@ -353,7 +354,8 @@ class Server:
             (
                 make_url_path_regex(base, f"{BIDI_COMPONENT_ENDPOINT}/(.*)"),
                 BidiComponentRequestHandler,
-                {"registry": self._runtime.bidi_component_registry},
+                # TODO: This needs to be the actual registry from the session
+                {"registry": BidiComponentRegistry()},
             ),
         ]
 

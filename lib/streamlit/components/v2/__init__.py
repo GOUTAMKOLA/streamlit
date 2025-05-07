@@ -18,7 +18,11 @@ import functools
 import inspect
 from typing import TYPE_CHECKING, Any, Callable
 
-from streamlit.components.v2.component_registry import BidiComponentDefinition
+from streamlit.components.v2.component_registry import (
+    BidiComponentDefinition,
+    BidiComponentRegistry,
+)
+from streamlit.runtime.scriptrunner import get_script_run_ctx
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -28,22 +32,31 @@ if TYPE_CHECKING:
     from streamlit.runtime.state.common import WidgetCallback
 
 
-def get_bidi_component_registry():
-    """Returns the singleton BidiComponentRegistry instance.
+def get_bidi_component_registry() -> BidiComponentRegistry:
+    """Get the BidiComponentRegistry for the current session."""
+    ctx = get_script_run_ctx()
+    if ctx is None:
+        # This case should ideally not be hit in normal app execution.
+        # It might occur in tests or if called from outside a script run.
+        # Depending on strictness, could raise an error or return a
+        # global/dummy registry if one makes sense. For now, raising an error.
+        raise RuntimeError("Cannot get BidiComponentRegistry: not in a script run.")
 
-    Returns
-    -------
-    BidiComponentRegistry
-        The singleton BidiComponentRegistry instance.
-    """
-    from streamlit.components.v2.component_registry import BidiComponentRegistry
+    # Avoid circular import by importing at function call time
     from streamlit.runtime import Runtime
 
-    if Runtime.exists():
-        return Runtime.instance().bidi_component_registry
-    else:
-        # Return a local registry when running without the streamlit runtime
-        return BidiComponentRegistry()
+    if not Runtime.exists():
+        raise RuntimeError("Cannot get BidiComponentRegistry: Runtime doesn't exist.")
+
+    runtime = Runtime.instance()
+    session_info = runtime._session_mgr.get_active_session_info(ctx.session_id)
+    if session_info is None or session_info.session is None:
+        # This would be unusual if ctx exists.
+        raise RuntimeError(
+            f"Cannot get BidiComponentRegistry: no active session found for id {ctx.session_id}."
+        )
+
+    return session_info.session.bidi_component_registry
 
 
 def component(
