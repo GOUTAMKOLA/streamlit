@@ -101,7 +101,8 @@ st.divider()
 st.header("Bidi Component")
 
 with st.echo():
-    JS_CODE = """export default function(component) {
+    JS_CODE = """
+export default function(component) {
   console.log("I am a bidi component", component)
 
   const { parentElement, onChange } = component
@@ -123,9 +124,11 @@ with st.echo():
     console.log("Cleaning up")
     form.removeEventListener("submit", handleSubmit)
   }
-}"""
+}
+"""
 
-    HTML_CODE = """<div>
+    HTML_CODE = """
+<div>
   <h1>Hello World</h1>
   <form>
     <label for="range">Range</label>
@@ -134,11 +137,14 @@ with st.echo():
     <input type="text" id="text" value="Text input" />
     <button type="submit">Submit form</button>
   </form>
-</div>"""
+</div>
+"""
 
-    CSS_CODE = """div {
+    CSS_CODE = """
+div {
   color: red;
-}"""
+}
+"""
 
     def my_component(
         *,
