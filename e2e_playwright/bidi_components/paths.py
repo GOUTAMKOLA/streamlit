@@ -17,48 +17,37 @@ from pathlib import Path
 
 import streamlit as st
 
-if "rerun_count" not in st.session_state:
-    st.session_state.rerun_count = 0
+with st.echo():
+    HTML_FORM = """
+<div>
+    <h1>Hello World</h1>
+    <form>
+        <label for="range">Range</label>
+        <input type="range" id="range" min="0" max="100" value="50" />
+        <label for="text">Text</label>
+        <input type="text" id="text" value="Text input" />
+        <button type="submit">Submit form</button>
+    </form>
+</div>
+"""
 
+    def my_component_with_paths(
+        js: str | Path | None,
+        html: str | None = None,
+        css: str | Path | None = None,
+    ):
+        out = st.components.v2.component(
+            name="my_component",
+            html=html,
+            js=js,
+            css=css,
+            key="my_component_1",
+        )
 
-def my_component_with_paths(
-    js: str | Path | None, html: str | None = None, css: str | Path | None = None
-):
-    # Get a callable function that renders the component
-    render_component = st.components.v2.component(
-        name="my_component",
-        html=html,
-        js=js,
-        css=css,
-        key="my_component_1",
+        return out
+
+    my_component_with_paths(
+        html=HTML_FORM,
+        js=Path(__file__).parent / "example" / "index.js",
+        css=Path(__file__).parent / "example" / "my_styles.css",
     )
-
-    return render_component
-
-
-HTML_FORM = """<div>
-  <h1>Hello World</h1>
-  <form>
-    <label for="range">Range</label>
-    <input type="range" id="range" min="0" max="100" value="50" />
-    <label for="text">Text</label>
-    <input type="text" id="text" value="Text input" />
-    <button type="submit">Submit form</button>
-  </form>
-</div>"""
-
-my_component_with_paths(
-    js=Path(__file__).parent / "example" / "index.js",
-    html=HTML_FORM,
-    css=Path(__file__).parent / "example" / "my_styles.css",
-)
-
-
-def rerun():
-    # Do something that causes the component to re-render
-    st.session_state.rerun_count += 1
-
-
-st.button("Update Component", on_click=rerun)
-
-st.write(f"Rerun count: {st.session_state.rerun_count}")
