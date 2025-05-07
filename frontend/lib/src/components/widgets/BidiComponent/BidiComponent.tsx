@@ -172,7 +172,7 @@ const useHandleJsContent = ({
     let cleanup: (() => void) | undefined
     let scriptElement: HTMLScriptElement | undefined
 
-    const onError = (error: unknown) => {
+    const onError = (error: unknown): void => {
       if (isMounted) {
         LOG.error(
           `BidiComponent Error: Failed to load or execute script for element ${id}`,
@@ -181,7 +181,7 @@ const useHandleJsContent = ({
       }
     }
 
-    const run = async () => {
+    const run = async (): Promise<void> => {
       try {
         if (jsContent) {
           const dataUri = `data:text/javascript;charset=utf-8,${encodeURIComponent(
