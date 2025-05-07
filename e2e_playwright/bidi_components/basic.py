@@ -13,8 +13,8 @@
 # limitations under the License.
 from __future__ import annotations
 
-import random
-from typing import Any
+import time
+from typing import Any, Callable
 
 import streamlit as st
 
@@ -23,19 +23,17 @@ if "js_code" not in st.session_state:
     st.session_state.js_code = """export default function(component) {
   console.log("I am a bidi component", component)
 
-  const { parentElement } = component
+  const { parentElement, onChange } = component
 
   const form = parentElement.querySelector("form")
   const handleSubmit = (event) => {
     event.preventDefault()
-    console.log("Form submitted with values", {
+    const formValues = {
       range: event.target.range.value,
       text: event.target.text.value,
-    })
-    alert("Form submitted with values: " + JSON.stringify({
-      range: event.target.range.value,
-      text: event.target.text.value,
-    }))
+    }
+    console.log("Form submitted with values", formValues)
+    onChange(formValues)
   }
 
   form.addEventListener("submit", handleSubmit)
@@ -67,13 +65,20 @@ if "isolate_styles" not in st.session_state:
     st.session_state.isolate_styles = True
 
 
-def my_component(*, key: str | None = None, data: Any | None = None):
+def my_component(
+    *,
+    key: str | None = None,
+    data: Any | None = None,
+    on_change: Callable | None = None,
+):
+    print(f"my_component called with key={key}, on_change={on_change}")
     # Get a callable function that renders the component
     render_component = st.components.v2.component(
         # For demo purposes, we'll use a random name to avoid collisions
         # and to ensure that the component is re-created when the form is
         # submitted.
-        name=f"my_component-{random.randint(0, 1000000)}",
+        # name=f"my_component-{random.randint(0, 1000000)}",
+        name="my_component",
         js=st.session_state.js_code,
         html=st.session_state.html_code,
         css=st.session_state.css_code,
@@ -84,6 +89,7 @@ def my_component(*, key: str | None = None, data: Any | None = None):
     out = render_component(
         key=key,
         data=data,
+        on_change=on_change,
     )
     return out
 
@@ -113,8 +119,29 @@ with st.form("bidi_editor", clear_on_submit=False):
     )
     submit_button = st.form_submit_button("Update Component", on_click=update_component)
 
+
+if "value" not in st.session_state:
+    st.session_state.value = 1
+
+if "last_callback_time" not in st.session_state:
+    st.session_state.last_callback_time = None
+
+
+def handle_change():
+    print("Value changed")
+    st.session_state.value += 1
+    st.session_state.last_callback_time = time.strftime("%H:%M:%S")
+    print(f"Value incremented to {st.session_state.value}")
+
+
 st.write("## Component Instances")
-# Display the components - these will update when the form is submitted
-# my_component()
-my_component(data={"label": "Some data from python"})
-# my_component(key="my_component_2")
+
+result = my_component(
+    key="my_component_1",
+    data={"label": "Some data from python"},
+    on_change=handle_change,
+)
+
+st.write(f"Counter value: {st.session_state.value}")
+if st.session_state.last_callback_time:
+    st.write(f"Last callback processed at: {st.session_state.last_callback_time}")

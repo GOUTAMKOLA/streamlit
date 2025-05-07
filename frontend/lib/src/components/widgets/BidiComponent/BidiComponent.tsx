@@ -18,7 +18,9 @@ import React, { FC, memo, useEffect, useId, useMemo, useRef } from "react"
 
 import { getLogger } from "loglevel"
 
-import { BidiComponent as BidiComponentProto } from "@streamlit/protobuf"
+import type { BidiComponent as BidiComponentProto } from "@streamlit/protobuf"
+
+import type { WidgetStateManager } from "src/WidgetStateManager"
 
 const LOG = getLogger("BidiComponent")
 
@@ -29,6 +31,7 @@ const getUrlForSourcePath = (sourcePath: string): string => {
 
 export type BidiComponentProps = {
   element: BidiComponentProto
+  widgetMgr: WidgetStateManager
 }
 
 const useHandleHtmlAndCssContent = ({
@@ -101,6 +104,7 @@ const useHandleJsContent = ({
   skip = false,
   data,
   jsSourcePath,
+  widgetMgr,
 }: {
   jsContent: string | undefined
   id: string
@@ -108,6 +112,7 @@ const useHandleJsContent = ({
   skip?: boolean
   data: string | undefined
   jsSourcePath: string | undefined
+  widgetMgr: WidgetStateManager
 }): void => {
   const componentId = `st-bidi-component-${useId()}`
 
@@ -138,6 +143,16 @@ const useHandleJsContent = ({
             key: componentId,
             parentElement: parentRef.current,
             childContainerIDs: [],
+            onChange: (value: unknown) => {
+              // This sends the value to the backend, which will trigger on_change callback
+              widgetMgr.setJsonValue(
+                { id },
+                value,
+                { fromUi: true },
+                // TODO: Support fragment IDs
+                undefined
+              )
+            },
           })
 
           if (typeof result === "function") {
@@ -198,6 +213,7 @@ const IsolatedComponent: FC<{
   data: string | undefined
   jsSourcePath: string | undefined
   cssSourcePath: string | undefined
+  widgetMgr: WidgetStateManager
 }> = ({
   id,
   jsContent,
@@ -206,6 +222,7 @@ const IsolatedComponent: FC<{
   data,
   jsSourcePath,
   cssSourcePath,
+  widgetMgr,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const shadowRootRef = useRef<ShadowRoot | null>(null)
@@ -252,6 +269,7 @@ const IsolatedComponent: FC<{
     jsSourcePath,
     parentRef: shadowRootRef,
     skip: !isShadowRootReady,
+    widgetMgr,
   })
 
   return <div ref={containerRef} data-testid="stBidiComponent-isolated" />
@@ -265,6 +283,7 @@ const NonIsolatedComponent: FC<{
   id: string
   jsContent: string | undefined
   jsSourcePath: string | undefined
+  widgetMgr: WidgetStateManager
 }> = ({
   cssContent,
   cssSourcePath,
@@ -273,6 +292,7 @@ const NonIsolatedComponent: FC<{
   id,
   jsContent,
   jsSourcePath,
+  widgetMgr,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -290,6 +310,7 @@ const NonIsolatedComponent: FC<{
     jsContent,
     jsSourcePath,
     parentRef: containerRef,
+    widgetMgr,
   })
 
   return <div ref={containerRef} data-testid="stBidiComponent-regular" />
@@ -309,7 +330,7 @@ const useProcessBidiElement = (
   }
 }
 
-const BidiComponent: FC<BidiComponentProps> = ({ element }) => {
+const BidiComponent: FC<BidiComponentProps> = ({ element, widgetMgr }) => {
   const { cssSourcePath, data, id, isolateStyles, jsContent, jsSourcePath } =
     element
 
@@ -325,6 +346,7 @@ const BidiComponent: FC<BidiComponentProps> = ({ element }) => {
       id={id}
       jsContent={jsContent ?? undefined}
       jsSourcePath={jsSourcePath ?? undefined}
+      widgetMgr={widgetMgr}
     />
   ) : (
     <NonIsolatedComponent
@@ -335,6 +357,7 @@ const BidiComponent: FC<BidiComponentProps> = ({ element }) => {
       id={id}
       jsContent={jsContent ?? undefined}
       jsSourcePath={jsSourcePath ?? undefined}
+      widgetMgr={widgetMgr}
     />
   )
 }

@@ -69,7 +69,6 @@ def component(
     """Register a bidirectional component.
 
     This function registers a bidirectional component in the component registry.
-    The component can then be used in Streamlit apps via st.bidi_component.
 
     Parameters
     ----------
