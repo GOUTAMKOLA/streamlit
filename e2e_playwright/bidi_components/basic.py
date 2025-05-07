@@ -98,7 +98,7 @@ with st.echo():
 st.divider()
 
 
-st.write("# Bidi Component")
+st.header("Bidi Component")
 
 with st.echo():
     JS_CODE = """export default function(component) {
