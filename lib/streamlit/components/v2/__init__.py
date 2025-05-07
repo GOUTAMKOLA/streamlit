@@ -14,9 +14,8 @@
 
 from __future__ import annotations
 
-import functools
 import inspect
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 from streamlit.components.v2.component_registry import BidiComponentDefinition
 
@@ -48,52 +47,18 @@ def get_bidi_component_registry():
 
 def component(
     name: str,
+    *,
     html: str | None = None,
     css: str | Path | None = None,
     js: str | Path | None = None,
     isolate_styles: bool = True,
-) -> Callable[..., BidiComponentState]:
-    """Register a bidirectional component.
-
-    This function registers a bidirectional component in the component registry.
-
-    Parameters
-    ----------
-    name : str
-        A short, descriptive name for the component.
-    html : str or None
-        HTML content as a string.
-    css : str, Path, or None
-        CSS content as a string, or a path to a CSS file.
-    js : str, Path, or None
-        JavaScript content as a string, or a path to a JS file.
-    isolate_styles : bool, default True
-        Whether to isolate the component's CSS styles to avoid affecting other elements.
-        Set to False if you want the component's styles to affect the entire page.
-
-    Returns
-    -------
-    Callable
-        A callable function that creates instances of the registered component.
-
-    Examples
-    --------
-    >>> import streamlit as st
-    >>>
-    >>> # Register a component with HTML, CSS, and JS
-    >>> def emoji_icon(emoji: str):
-    ...     component_name = "emojiIconComponent"
-    ...     out = st.components.v2.component(
-    ...         name=component_name,
-    ...         html=f"<div>{emoji}</div>",
-    ...         css="div { font-size: 2em; }",
-    ...     )
-    ...
-    ...     return out
-    >>>
-    >>> # Use the component in a Streamlit app
-    >>> emoji_icon("🚀")
-    """
+    key: str | None = None,
+    default: Any = None,
+    on_change: WidgetCallback | None = None,
+    data: Any | None = None,
+    **kwargs,
+) -> BidiComponentState:
+    """Register and render a bidirectional component immediately, matching the product spec API."""
     import streamlit as st
 
     # Get our stack frame.
@@ -119,37 +84,11 @@ def component(
         )
     )
 
-    # Create a wrapper function that calls st.bidi_component with the registered component name
-    @functools.wraps(st.bidi_component)
-    def component_instance(
-        *args,
-        key: str | None = None,
-        default: Any = None,
-        on_change: WidgetCallback | None = None,
+    return st.bidi_component(
+        name,
+        key=key,
+        default=default,
+        on_change=on_change,
+        data=data,
         **kwargs,
-    ) -> BidiComponentState:
-        """Create an instance of the registered component.
-
-        Parameters
-        ----------
-        *args
-            Positional arguments to pass to the component.
-        key : str or None
-            An optional string to use as the unique key for the component.
-        default: any or None
-            The default return value for the component.
-        on_change: WidgetCallback or None
-            An optional callback invoked when the component's value changes.
-        **kwargs
-            Keyword arguments to pass to the component.
-
-        Returns
-        -------
-        BidiComponentState
-            The component's state.
-        """
-        return st.bidi_component(
-            name, *args, key=key, default=default, on_change=on_change, **kwargs
-        )
-
-    return component_instance
+    )

@@ -18,9 +18,90 @@ from typing import Any, Callable
 
 import streamlit as st
 
-# Initialize session state to store component code
-if "js_code" not in st.session_state:
-    st.session_state.js_code = """export default function(component) {
+st.header("Static icon component (inline, no JS framework)")
+
+st.write(
+    "Taken from the [Product Spec](https://www.notion.so/snowflake-corp/Latest-Product-Spec-2840a4c245e84ba4a921d7122a2209b8?pvs=4#3aa0b75f1b4946e89e16283766fabe63)"
+)
+
+with st.echo():
+
+    def emoji_icon(emoji):
+        component_name = "emojiIconComponent"
+
+        out = st.components.v2.component(
+            component_name,
+            html=f"""
+                <h1 class="largeIcon-{component_name}">{emoji}</h1>
+            """,
+            # It's a good idea to put the component_name in CSS classes
+            # in order to avoid leaking the class to other parts of the app.
+            # Alternatively, you could set isolate_styles=True
+            css=f"""
+                .largeIcon-{component_name} {{
+                    font-size: 3rem;
+                    padding: 0;
+                    margin: 0;
+                }}
+            """,
+        )
+
+        return out
+
+    emoji_icon("🚀")
+
+
+st.divider()
+
+st.header("Icon component with pure-JS click event (inline, no JS framework)")
+
+st.write(
+    "Taken from the [Product Spec](https://www.notion.so/snowflake-corp/Latest-Product-Spec-2840a4c245e84ba4a921d7122a2209b8?pvs=4#17b7170bb41680d2b5c1c4cb4dea0503)"
+)
+
+with st.echo():
+
+    def emoji_icon(emoji):
+        component_name = "emojiIconComponent2"
+
+        out = st.components.v2.component(
+            component_name,
+            html=f"""
+                <h1 class="largeIcon-{component_name}">{emoji}</h1>
+            """,
+            # It's a good idea to put the component_name in CSS classes
+            # in order to avoid leaking the class to other parts of the app.
+            # Alternatively, you could set isolate_styles=True
+            css=f"""
+                .largeIcon-{component_name} {{
+                    font-size: 3rem;
+                    padding: 0;
+                    margin: 0;
+                }}
+            """,
+            # Just to show how we could add JS to the above, let's attach a
+            # click listener to the emoji above to display an alert window.
+            js="""
+                export default function main(component) {
+                    component.parentElement.querySelector("h1").addEventListener(
+                        "click",
+                        () => alert("Clicked!"),
+                    )
+                }
+            """,
+        )
+
+        return out
+
+    emoji_icon("🚀")
+
+st.divider()
+
+
+st.write("# Bidi Component")
+
+with st.echo():
+    JS_CODE = """export default function(component) {
   console.log("I am a bidi component", component)
 
   const { parentElement, onChange } = component
@@ -44,8 +125,7 @@ if "js_code" not in st.session_state:
   }
 }"""
 
-if "html_code" not in st.session_state:
-    st.session_state.html_code = """<div>
+    HTML_CODE = """<div>
   <h1>Hello World</h1>
   <form>
     <label for="range">Range</label>
@@ -56,88 +136,41 @@ if "html_code" not in st.session_state:
   </form>
 </div>"""
 
-if "css_code" not in st.session_state:
-    st.session_state.css_code = """div {
+    CSS_CODE = """div {
   color: red;
 }"""
 
-if "isolate_styles" not in st.session_state:
-    st.session_state.isolate_styles = True
+    def my_component(
+        *,
+        key: str | None = None,
+        data: Any | None = None,
+        on_change: Callable | None = None,
+    ):
+        out = st.components.v2.component(
+            name="my_component",
+            js=JS_CODE,
+            html=HTML_CODE,
+            css=CSS_CODE,
+            isolate_styles=True,
+            key=key,
+            data=data,
+            on_change=on_change,
+        )
+        return out
 
+    if "last_callback_time" not in st.session_state:
+        st.session_state.last_callback_time = None
 
-def my_component(
-    *,
-    key: str | None = None,
-    data: Any | None = None,
-    on_change: Callable | None = None,
-):
-    # Get a callable function that renders the component
-    render_component = st.components.v2.component(
-        name="my_component",
-        js=st.session_state.js_code,
-        html=st.session_state.html_code,
-        css=st.session_state.css_code,
-        isolate_styles=st.session_state.isolate_styles,
+    def handle_change():
+        print("Value changed")
+        st.session_state.last_callback_time = time.strftime("%H:%M:%S")
+
+    result = my_component(
+        key="my_component_1",
+        data={"label": "Some data from python"},
+        on_change=handle_change,
     )
 
-    # Call the function to render the component
-    out = render_component(
-        key=key,
-        data=data,
-        on_change=on_change,
-    )
-    return out
-
-
-def update_component():
-    # Update session state with form values
-    st.session_state.js_code = st.session_state.js_editor
-    st.session_state.html_code = st.session_state.html_editor
-    st.session_state.css_code = st.session_state.css_editor
-    st.session_state.isolate_styles = st.session_state.isolate_styles_checkbox
-
-
-st.write("# Bidi Component Editor")
-
-# Create a form for editing the component code
-st.write("## Edit Component")
-with st.form("bidi_editor", clear_on_submit=False):
-    st.text_area(
-        "JavaScript Code", st.session_state.js_code, height=200, key="js_editor"
-    )
-    st.text_area("HTML Code", st.session_state.html_code, height=200, key="html_editor")
-    st.text_area("CSS Code", st.session_state.css_code, height=200, key="css_editor")
-    st.checkbox(
-        "Isolate Styles",
-        value=st.session_state.isolate_styles,
-        key="isolate_styles_checkbox",
-    )
-    submit_button = st.form_submit_button("Update Component", on_click=update_component)
-
-
-if "value" not in st.session_state:
-    st.session_state.value = 1
-
-if "last_callback_time" not in st.session_state:
-    st.session_state.last_callback_time = None
-
-
-def handle_change():
-    print("Value changed")
-    st.session_state.value += 1
-    st.session_state.last_callback_time = time.strftime("%H:%M:%S")
-    print(f"Value incremented to {st.session_state.value}")
-
-
-st.write("## Component Instances")
-
-result = my_component(
-    key="my_component_1",
-    data={"label": "Some data from python"},
-    on_change=handle_change,
-)
-
-st.write(f"Result: {result}")
-st.write(f"Counter value: {st.session_state.value}")
-if st.session_state.last_callback_time:
-    st.write(f"Last callback processed at: {st.session_state.last_callback_time}")
+    st.write(f"Result: {result}")
+    if st.session_state.last_callback_time:
+        st.write(f"Last callback processed at: {st.session_state.last_callback_time}")

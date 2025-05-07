@@ -26,14 +26,13 @@ def my_component_with_paths(
 ):
     # Get a callable function that renders the component
     render_component = st.components.v2.component(
-        name="my_component_with_paths",
-        js=js,
-        html=html,
-        css=css,
-        isolate_styles=True,
+        name="my_component",
+        html="<div>hello</div>",
+        js="export default function(component) {}",
+        key="my_component_1",
     )
 
-    return render_component()
+    return render_component
 
 
 HTML_FORM = """<div>
