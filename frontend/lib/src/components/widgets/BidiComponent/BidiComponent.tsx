@@ -104,7 +104,7 @@ const importAndRunModule = async ({
   componentId: string
   widgetMgr: WidgetStateManager
   onError: (error: unknown) => void
-}): Promise<() => void | undefined> => {
+}): Promise<(() => void) | undefined> => {
   try {
     const module = await import(/* @vite-ignore */ moduleUrl)
     if (
@@ -131,8 +131,6 @@ const importAndRunModule = async ({
   } catch (error) {
     onError(error)
   }
-
-  return () => {}
 }
 
 const useHandleJsContent = ({
@@ -197,10 +195,16 @@ const useHandleJsContent = ({
 
           // Wait for script to load or error
           await new Promise<void>((resolve, reject) => {
-            scriptElement!.onload = () => resolve()
-            scriptElement!.onerror = () =>
+            if (!scriptElement) {
+              reject(new Error("Script element not found"))
+              return
+            }
+
+            scriptElement.onload = () => resolve()
+            scriptElement.onerror = () =>
               reject(new Error("Script load error"))
-            document.head.appendChild(scriptElement!)
+
+            document.head.appendChild(scriptElement)
           })
 
           cleanup = await importAndRunModule({
