@@ -48,6 +48,6 @@ with st.echo():
 
     my_component_with_paths(
         html=HTML_FORM,
-        js=Path(__file__).parent / "example" / "index.js",
-        css=Path(__file__).parent / "example" / "my_styles.css",
+        js=Path(__file__).parent / "index.js",
+        css=Path(__file__).parent / "my_styles.css",
     )
