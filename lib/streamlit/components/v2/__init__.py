@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from streamlit.runtime.state.common import WidgetCallback
 
 
+# TODO: Move this into somewhere that is not public
 def get_bidi_component_registry():
     """Returns the singleton BidiComponentRegistry instance.
 

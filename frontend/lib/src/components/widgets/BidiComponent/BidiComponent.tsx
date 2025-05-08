@@ -156,10 +156,12 @@ const loadAndRunModule = async ({
   }
 
   const cleanup = module.default({
+    // TODO: FIXME:
     name: "",
     data,
     key: componentId,
     parentElement,
+    // TODO: FIXME:
     childContainerIDs: [],
     onChange: (value: unknown) => {
       // TODO: We will need to make this generic so that it supports not only JSON values
