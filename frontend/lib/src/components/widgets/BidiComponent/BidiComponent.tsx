@@ -130,6 +130,15 @@ type ComponentResult = {
   cleanup?: () => void
 }
 
+type StComponentV2Args = {
+  name: string
+  data: unknown
+  key: string
+  parentElement: HTMLElement | ShadowRoot
+  childContainerIDs: string[]
+  onChange: (value: unknown) => void
+}
+
 const loadAndRunModule = async ({
   componentId,
   componentIdForWidgetMgr,
