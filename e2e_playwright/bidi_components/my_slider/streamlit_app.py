@@ -54,4 +54,6 @@ with st.echo():
         key="my_slider",
     )
 
-    st.write(st.session_state["value"])
+    st.write(
+        f"Value from component: {value}, session state: {st.session_state['value']}"
+    )

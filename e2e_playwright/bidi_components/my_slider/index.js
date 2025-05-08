@@ -22,7 +22,7 @@ export default function main(component) {
     component.data.min,
     component.data.max,
     component.data.value,
-    (el) => component.onChange(el.value)
+    (el) => component.onChange(el.target.value)
   );
 
   component.parentElement.append(sliderEl);
