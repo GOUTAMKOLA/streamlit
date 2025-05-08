@@ -14,13 +14,14 @@
  * limitations under the License.
  */
 
-import React, { FC, memo, useEffect, useId, useMemo, useRef } from "react"
+import React, { FC, memo, useEffect, useId, useRef, useState } from "react"
 
 import { getLogger } from "loglevel"
 
 import type { BidiComponent as BidiComponentProto } from "@streamlit/protobuf"
 
 import type { WidgetStateManager } from "src/WidgetStateManager"
+import ErrorElement from "~lib/components/shared/ErrorElement"
 
 const LOG = getLogger("BidiComponent")
 
@@ -33,121 +34,166 @@ export type BidiComponentProps = {
   widgetMgr: WidgetStateManager
 }
 
+/**
+ * Normalize errors to a standard Error object
+ */
+const normalizeError = (error: unknown, context?: string): Error => {
+  if (error instanceof Error) {
+    return error
+  }
+
+  const message = context ? `${context}: ${String(error)}` : String(error)
+  return new Error(message)
+}
+
+/**
+ * Centralized error handler to log and set error state
+ */
+const handleError = (
+  error: unknown,
+  setError: (error: Error) => void,
+  context?: string
+): void => {
+  const normalizedError = normalizeError(error, context)
+  LOG.error(`BidiComponent Error: ${normalizedError.message}`, error)
+  setError(normalizedError)
+}
+
 const useHandleHtmlAndCssContent = ({
   containerRef,
-  html,
   cssContent,
-  skip = false,
   cssSourcePath,
+  html,
+  setError,
+  skip = false,
 }: {
   containerRef: React.RefObject<HTMLElement | ShadowRoot>
-  html: string | undefined
   cssContent: string | undefined
-  skip?: boolean
   cssSourcePath: string | undefined
+  html: string | undefined
+  setError: (error: Error) => void
+  skip?: boolean
 }): React.MutableRefObject<HTMLDivElement | null> => {
   const contentRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
-    const parent = containerRef.current
-
-    if (skip || !parent) {
+    if (skip) {
       return
     }
 
-    // Clean up previous content
-    if (contentRef.current && contentRef.current.parentNode === parent) {
-      parent.removeChild(contentRef.current)
+    const parent = containerRef.current
+    if (!parent) {
+      return
     }
 
-    // Create new content container
-    contentRef.current = document.createElement("div")
+    try {
+      // Clean up previous content
+      if (contentRef.current && contentRef.current.parentNode === parent) {
+        parent.removeChild(contentRef.current)
+      }
 
-    // Add HTML content if available
-    if (html) {
-      const htmlDiv = document.createElement("div")
-      htmlDiv.innerHTML = html
-      contentRef.current.appendChild(htmlDiv)
+      // Create new content container
+      contentRef.current = document.createElement("div")
+
+      // Add HTML content if available
+      if (html) {
+        const htmlDiv = document.createElement("div")
+        htmlDiv.innerHTML = html
+        contentRef.current.appendChild(htmlDiv)
+      }
+
+      // Add CSS content if available
+      if (cssContent) {
+        const styleElement = document.createElement("style")
+        styleElement.textContent = cssContent
+        contentRef.current.appendChild(styleElement)
+      } else if (cssSourcePath) {
+        const linkElement = document.createElement("link")
+        linkElement.href = getUrlForSourcePath(cssSourcePath)
+        linkElement.rel = "stylesheet"
+        linkElement.onerror = () => {
+          handleError(`Failed to load CSS from ${cssSourcePath}`, setError)
+        }
+        contentRef.current.appendChild(linkElement)
+      }
+
+      parent.appendChild(contentRef.current)
+    } catch (error) {
+      handleError(error, setError, "Failed to process HTML/CSS content")
     }
-
-    // Add CSS content if available
-    if (cssContent) {
-      const styleElement = document.createElement("style")
-      styleElement.textContent = cssContent
-      contentRef.current.appendChild(styleElement)
-    } else if (cssSourcePath) {
-      const linkElement = document.createElement("link")
-      linkElement.href = getUrlForSourcePath(cssSourcePath)
-      linkElement.rel = "stylesheet"
-      contentRef.current.appendChild(linkElement)
-    }
-
-    parent.appendChild(contentRef.current)
-  }, [html, cssContent, containerRef, skip, cssSourcePath])
+  }, [html, cssContent, containerRef, cssSourcePath, setError, skip])
 
   return contentRef
 }
 
-const importAndRunModule = async ({
-  moduleUrl,
-  id,
-  parentRef,
-  data,
+type ComponentResult = {
+  cleanup?: () => void
+}
+
+const loadAndRunModule = async ({
   componentId,
+  componentIdForWidgetMgr,
+  data,
+  moduleUrl,
+  parentElement,
   widgetMgr,
-  onError,
 }: {
-  moduleUrl: string
-  id: string
-  parentRef: React.RefObject<HTMLDivElement | ShadowRoot | null>
-  data: string | undefined
   componentId: string
+  componentIdForWidgetMgr: string
+  data: unknown
+  moduleUrl: string
+  parentElement: HTMLElement | ShadowRoot
   widgetMgr: WidgetStateManager
-  onError: (error: unknown) => void
-}): Promise<(() => void) | undefined> => {
-  try {
-    const module = await import(/* @vite-ignore */ moduleUrl)
-    if (
-      module.default &&
-      typeof module.default === "function" &&
-      parentRef.current
-    ) {
-      const result = module.default({
-        name: "",
-        data: data ? JSON.parse(data) : null,
-        key: componentId,
-        parentElement: parentRef.current,
-        childContainerIDs: [],
-        onChange: (value: unknown) => {
-          widgetMgr.setJsonValue({ id }, value, { fromUi: true }, undefined)
-        },
-      })
-      if (typeof result === "function") {
-        return result
-      }
-    } else {
-      onError("Module does not have a default export function.")
-    }
-  } catch (error) {
-    onError(error)
+}): Promise<ComponentResult> => {
+  const module = await import(/* @vite-ignore */ moduleUrl)
+
+  if (!module) {
+    throw new Error("JS module does not exist.")
+  }
+
+  if (!module.default || typeof module.default !== "function") {
+    throw new Error("JS module does not have a default export function.")
+  }
+
+  const cleanup = module.default({
+    name: "",
+    data,
+    key: componentId,
+    parentElement,
+    childContainerIDs: [],
+    onChange: (value: unknown) => {
+      // TODO: We will need to make this generic so that it supports not only JSON values
+      widgetMgr.setJsonValue(
+        { id: componentIdForWidgetMgr },
+        value,
+        { fromUi: true },
+        undefined
+      )
+    },
+  })
+
+  return {
+    cleanup: typeof cleanup === "function" ? cleanup : undefined,
   }
 }
 
 const useHandleJsContent = ({
-  jsContent,
-  id,
-  parentRef,
-  skip = false,
   data,
+  id,
+  jsContent,
   jsSourcePath,
+  parentRef,
+  setError,
+  skip = false,
   widgetMgr,
 }: {
-  jsContent: string | undefined
-  id: string
-  parentRef: React.RefObject<HTMLDivElement | ShadowRoot | null>
-  skip?: boolean
   data: string | undefined
+  id: string
+  jsContent: string | undefined
   jsSourcePath: string | undefined
+  parentRef: React.RefObject<HTMLElement | ShadowRoot>
+  setError: (error: Error) => void
+  skip?: boolean
   widgetMgr: WidgetStateManager
 }): void => {
   const componentId = `st-bidi-component-${useId()}`
@@ -158,147 +204,159 @@ const useHandleJsContent = ({
     }
 
     let isMounted = true
-    let cleanup: (() => void) | undefined
+    let cleanup: ComponentResult["cleanup"]
     let scriptElement: HTMLScriptElement | undefined
 
-    const onError = (error: unknown): void => {
-      if (isMounted) {
-        LOG.error(
-          `BidiComponent Error: Failed to load or execute script for element ${id}`,
-          error
-        )
-      }
-    }
+    const parsedData = data ? JSON.parse(data) : null
 
     const run = async (): Promise<void> => {
       try {
+        // Handle inline JS content
         if (jsContent) {
           const dataUri = `data:text/javascript;charset=utf-8,${encodeURIComponent(
             jsContent
           )}`
 
-          cleanup = await importAndRunModule({
+          const result = await loadAndRunModule({
             moduleUrl: dataUri,
-            id,
-            parentRef,
-            data,
             componentId,
+            parentElement: parentRef.current!,
+            data: parsedData,
+            componentIdForWidgetMgr: id,
             widgetMgr,
-            onError,
           })
-        } else if (jsSourcePath) {
+
+          cleanup = result.cleanup
+        }
+        // Handle external JS file
+        else if (jsSourcePath) {
           const scriptUrl = getUrlForSourcePath(jsSourcePath)
-          scriptElement = document.createElement("script")
-          scriptElement.type = "module"
-          scriptElement.src = scriptUrl
-          scriptElement.async = true
 
-          // Wait for script to load or error
-          await new Promise<void>((resolve, reject) => {
-            if (!scriptElement) {
-              reject(new Error("Script element not found"))
-              return
-            }
+          try {
+            // Load the script
+            await new Promise<void>((resolve, reject) => {
+              scriptElement = document.createElement("script")
+              scriptElement.type = "module"
+              scriptElement.src = scriptUrl
+              scriptElement.async = true
+              scriptElement.onload = () => resolve()
+              scriptElement.onerror = () =>
+                reject(new Error(`Failed to load script from ${jsSourcePath}`))
+              document.head.appendChild(scriptElement)
+            })
 
-            scriptElement.onload = () => resolve()
-            scriptElement.onerror = () =>
-              reject(new Error("Script load error"))
+            // Run the module
+            const result = await loadAndRunModule({
+              moduleUrl: scriptUrl,
+              componentId,
+              parentElement: parentRef.current!,
+              data: parsedData,
+              componentIdForWidgetMgr: id,
+              widgetMgr,
+            })
 
-            document.head.appendChild(scriptElement)
-          })
-
-          cleanup = await importAndRunModule({
-            moduleUrl: scriptUrl,
-            id,
-            parentRef,
-            data,
-            componentId,
-            widgetMgr,
-            onError,
-          })
+            cleanup = result.cleanup
+          } catch (error) {
+            throw normalizeError(
+              error,
+              `Failed to load or execute script from ${jsSourcePath}`
+            )
+          }
         }
       } catch (error) {
-        onError(error)
+        if (isMounted) {
+          handleError(error, setError)
+        }
       }
     }
 
     run()
 
+    // Cleanup function
     return () => {
       isMounted = false
+
       if (cleanup) {
         try {
           cleanup()
         } catch (error) {
-          LOG.error(
-            `BidiComponent Error: Failed to run cleanup for element ${id}`,
-            error
-          )
+          LOG.error(`Failed to run cleanup for element ${id}`, error)
         }
       }
-      if (scriptElement && scriptElement.parentNode) {
+
+      if (scriptElement?.parentNode) {
         scriptElement.parentNode.removeChild(scriptElement)
       }
     }
-    // eslint-disable-next-line react-compiler/react-compiler
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [skip])
+  }, [
+    componentId,
+    data,
+    id,
+    jsContent,
+    jsSourcePath,
+    parentRef,
+    setError,
+    skip,
+    widgetMgr,
+  ])
 }
 
-const IsolatedComponent: FC<{
+interface ComponentBaseProps {
   id: string
-  jsContent: string | undefined
   htmlContent: string | undefined
   cssContent: string | undefined
-  data: string | undefined
-  jsSourcePath: string | undefined
   cssSourcePath: string | undefined
+  jsContent: string | undefined
+  jsSourcePath: string | undefined
+  data: string | undefined
   widgetMgr: WidgetStateManager
-}> = ({
+}
+
+const IsolatedComponent: FC<ComponentBaseProps> = ({
   id,
-  jsContent,
-  htmlContent: html,
+  htmlContent,
   cssContent,
-  data,
-  jsSourcePath,
   cssSourcePath,
+  jsContent,
+  jsSourcePath,
+  data,
   widgetMgr,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null)
   const shadowRootRef = useRef<ShadowRoot | null>(null)
-  const [isShadowRootReady, setIsShadowRootReady] = React.useState(false)
+  const [isShadowRootReady, setIsShadowRootReady] = useState(false)
+  const [error, setError] = useState<Error | null>(null)
 
+  // Set up Shadow DOM
   useEffect(() => {
-    if (!containerRef.current) {
-      return
-    }
-
-    // Don't try to attach a shadow root if the element already has one
-    if (containerRef.current.shadowRoot) {
-      shadowRootRef.current = containerRef.current.shadowRoot
-      setIsShadowRootReady(true)
-      return
-    }
+    if (!containerRef.current) return
 
     try {
+      // Don't try to attach a shadow root if the element already has one
+      if (containerRef.current.shadowRoot) {
+        shadowRootRef.current = containerRef.current.shadowRoot
+        setIsShadowRootReady(true)
+        return
+      }
+
       shadowRootRef.current = containerRef.current.attachShadow({
         mode: "open",
       })
       setIsShadowRootReady(true)
     } catch (error) {
-      LOG.error(
-        `BidiComponent Error: Failed to create shadow DOM for element ${id}`,
-        error
-      )
+      handleError(error, setError, "Failed to create shadow DOM")
     }
   }, [id])
+
+  const shouldSkipContent = !isShadowRootReady || !!error
 
   useHandleHtmlAndCssContent({
     containerRef: shadowRootRef,
     cssContent,
     cssSourcePath,
-    html,
-    skip: !isShadowRootReady,
+    html: htmlContent,
+    setError,
+    skip: shouldSkipContent,
   })
 
   useHandleJsContent({
@@ -307,39 +365,44 @@ const IsolatedComponent: FC<{
     jsContent,
     jsSourcePath,
     parentRef: shadowRootRef,
-    skip: !isShadowRootReady,
+    setError,
+    skip: shouldSkipContent,
     widgetMgr,
   })
+
+  if (error) {
+    return (
+      <ErrorElement
+        name="BidiComponent Error"
+        message={error.message}
+        stack={error.stack}
+      />
+    )
+  }
 
   return <div ref={containerRef} data-testid="stBidiComponent-isolated" />
 }
 
-const NonIsolatedComponent: FC<{
-  cssContent: string | undefined
-  cssSourcePath: string | undefined
-  data: string | undefined
-  htmlContent: string | undefined
-  id: string
-  jsContent: string | undefined
-  jsSourcePath: string | undefined
-  widgetMgr: WidgetStateManager
-}> = ({
+const NonIsolatedComponent: FC<ComponentBaseProps> = ({
   cssContent,
   cssSourcePath,
   data,
-  htmlContent: html,
+  htmlContent,
   id,
   jsContent,
   jsSourcePath,
   widgetMgr,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null)
+  const [error, setError] = useState<Error | null>(null)
 
   useHandleHtmlAndCssContent({
     containerRef,
     cssContent,
     cssSourcePath,
-    html,
+    html: htmlContent,
+    setError,
+    skip: !!error,
   })
 
   useHandleJsContent({
@@ -349,52 +412,55 @@ const NonIsolatedComponent: FC<{
     jsSourcePath,
     parentRef: containerRef,
     widgetMgr,
+    setError,
+    skip: !!error,
   })
+
+  if (error) {
+    return (
+      <ErrorElement
+        name="BidiComponent Error"
+        message={error.message}
+        stack={error.stack}
+      />
+    )
+  }
 
   return <div ref={containerRef} data-testid="stBidiComponent-regular" />
 }
 
-const useProcessBidiElement = (
-  element: BidiComponentProto
-): { html: string | undefined; css: string | undefined } => {
-  const { htmlContent, cssContent } = element
-
-  const userHtmlContent = useMemo(() => htmlContent?.trim(), [htmlContent])
-  const userCssContent = useMemo(() => cssContent?.trim(), [cssContent])
-
-  return {
-    html: userHtmlContent,
-    css: userCssContent,
-  }
-}
-
 const BidiComponent: FC<BidiComponentProps> = ({ element, widgetMgr }) => {
-  const { cssSourcePath, data, id, isolateStyles, jsContent, jsSourcePath } =
-    element
+  const {
+    cssContent,
+    cssSourcePath,
+    data,
+    htmlContent,
+    id,
+    isolateStyles,
+    jsContent,
+    jsSourcePath,
+  } = element
 
-  const { html, css } = useProcessBidiElement(element)
-
-  // Render either isolated or non-isolated component based on isolateStyles flag
   return isolateStyles ? (
     <IsolatedComponent
-      cssContent={css}
-      cssSourcePath={cssSourcePath ?? undefined}
-      data={data}
-      htmlContent={html}
       id={id}
-      jsContent={jsContent ?? undefined}
-      jsSourcePath={jsSourcePath ?? undefined}
+      htmlContent={htmlContent?.trim()}
+      cssContent={cssContent?.trim()}
+      cssSourcePath={cssSourcePath || undefined}
+      jsContent={jsContent || undefined}
+      jsSourcePath={jsSourcePath || undefined}
+      data={data}
       widgetMgr={widgetMgr}
     />
   ) : (
     <NonIsolatedComponent
-      cssContent={css}
-      cssSourcePath={cssSourcePath ?? undefined}
-      data={data}
-      htmlContent={html}
       id={id}
-      jsContent={jsContent ?? undefined}
-      jsSourcePath={jsSourcePath ?? undefined}
+      htmlContent={htmlContent?.trim()}
+      cssContent={cssContent?.trim()}
+      cssSourcePath={cssSourcePath || undefined}
+      jsContent={jsContent || undefined}
+      jsSourcePath={jsSourcePath || undefined}
+      data={data}
       widgetMgr={widgetMgr}
     />
   )
