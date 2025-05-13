@@ -130,6 +130,7 @@ const useHandleHtmlAndCssContent = ({
 const loadAndRunModule = async ({
   componentId,
   componentIdForWidgetMgr,
+  componentName,
   data,
   moduleUrl,
   parentElement,
@@ -137,6 +138,7 @@ const loadAndRunModule = async ({
 }: {
   componentId: string
   componentIdForWidgetMgr: string
+  componentName: string
   data: unknown
   moduleUrl: string
   parentElement: HTMLElement | ShadowRoot
@@ -153,9 +155,10 @@ const loadAndRunModule = async ({
   }
 
   const cleanup = module.default({
-    // TODO: FIXME:
-    name: "",
+    name: componentName,
     data,
+    // TODO: We should not pass `key`, since React gives a warning, since `key`
+    // is a reserved prop.
     key: componentId,
     parentElement,
     // TODO: FIXME:
@@ -176,6 +179,7 @@ const loadAndRunModule = async ({
 }
 
 const useHandleJsContent = ({
+  componentName,
   data,
   id,
   jsContent,
@@ -185,6 +189,7 @@ const useHandleJsContent = ({
   skip = false,
   widgetMgr,
 }: {
+  componentName: string
   data: string | undefined
   id: string
   jsContent: string | undefined
@@ -216,6 +221,7 @@ const useHandleJsContent = ({
           )}`
 
           const result = await loadAndRunModule({
+            componentName,
             moduleUrl: dataUri,
             componentId,
             parentElement: parentRef.current!,
@@ -245,6 +251,7 @@ const useHandleJsContent = ({
 
             // Run the module
             const result = await loadAndRunModule({
+              componentName,
               moduleUrl: scriptUrl,
               componentId,
               parentElement: parentRef.current!,
@@ -300,6 +307,7 @@ const useHandleJsContent = ({
 }
 
 interface ComponentBaseProps {
+  componentName: string
   id: string
   htmlContent: string | undefined
   cssContent: string | undefined
@@ -311,6 +319,7 @@ interface ComponentBaseProps {
 }
 
 const IsolatedComponent: FC<ComponentBaseProps> = ({
+  componentName,
   id,
   htmlContent,
   cssContent,
@@ -358,6 +367,7 @@ const IsolatedComponent: FC<ComponentBaseProps> = ({
   })
 
   useHandleJsContent({
+    componentName,
     data,
     id,
     jsContent,
@@ -382,6 +392,7 @@ const IsolatedComponent: FC<ComponentBaseProps> = ({
 }
 
 const NonIsolatedComponent: FC<ComponentBaseProps> = ({
+  componentName,
   cssContent,
   cssSourcePath,
   data,
@@ -404,6 +415,7 @@ const NonIsolatedComponent: FC<ComponentBaseProps> = ({
   })
 
   useHandleJsContent({
+    componentName,
     data,
     id,
     jsContent,
@@ -429,6 +441,7 @@ const NonIsolatedComponent: FC<ComponentBaseProps> = ({
 
 const BidiComponent: FC<BidiComponentProps> = ({ element, widgetMgr }) => {
   const {
+    componentName,
     cssContent,
     cssSourcePath,
     data,
@@ -441,6 +454,7 @@ const BidiComponent: FC<BidiComponentProps> = ({ element, widgetMgr }) => {
 
   return isolateStyles ? (
     <IsolatedComponent
+      componentName={componentName}
       id={id}
       htmlContent={htmlContent?.trim()}
       cssContent={cssContent?.trim()}
@@ -452,6 +466,7 @@ const BidiComponent: FC<BidiComponentProps> = ({ element, widgetMgr }) => {
     />
   ) : (
     <NonIsolatedComponent
+      componentName={componentName}
       id={id}
       htmlContent={htmlContent?.trim()}
       cssContent={cssContent?.trim()}
