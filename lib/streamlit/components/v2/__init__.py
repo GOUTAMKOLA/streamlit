@@ -24,11 +24,12 @@ if TYPE_CHECKING:
     from types import FrameType
 
     from streamlit.components.v2.bidi_component import BidiComponentState
+    from streamlit.components.v2.component_registry import BidiComponentRegistry
     from streamlit.runtime.state.common import WidgetCallback
 
 
 # TODO: Move this into somewhere that is not public
-def get_bidi_component_registry():
+def get_bidi_component_registry() -> BidiComponentRegistry:
     """Returns the singleton BidiComponentRegistry instance.
 
     Returns
@@ -57,9 +58,9 @@ def component(
     default: Any = None,
     on_change: WidgetCallback | None = None,
     data: Any | None = None,
-    **kwargs,
+    **kwargs: Any,
 ) -> BidiComponentState:
-    """Register and render a bidirectional component immediately, matching the product spec API."""
+    """Register and render a bidirectional component immediately."""
     import streamlit as st
 
     # Get our stack frame.

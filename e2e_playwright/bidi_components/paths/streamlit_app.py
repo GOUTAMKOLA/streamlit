@@ -14,8 +14,12 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import streamlit as st
+
+if TYPE_CHECKING:
+    from lib.streamlit.components.v2.bidi_component import BidiComponentState
 
 with st.echo():
     HTML_FORM = """
@@ -35,7 +39,7 @@ with st.echo():
         js: str | Path | None,
         html: str | None = None,
         css: str | Path | None = None,
-    ):
+    ) -> BidiComponentState:
         out = st.components.v2.component(
             name="my_component",
             html=html,

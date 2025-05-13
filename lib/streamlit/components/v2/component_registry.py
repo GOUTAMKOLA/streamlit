@@ -125,14 +125,13 @@ class BidiComponentDefinition:
                     # Relative path, make it relative to the caller's file
                     caller_dir = os.path.dirname(_get_caller_path())
                     abs_path = os.path.abspath(os.path.join(caller_dir, content_str))
-                    print(f"abs_path: {abs_path}")
 
                 if not os.path.exists(abs_path):
-                    raise ValueError(f"File does not exist: {abs_path}")
+                    raise ValueError(f"File does not exist: {abs_path}")  # noqa: TRY301
 
                 return True, abs_path
-            except Exception as e:
-                _LOGGER.error(f"Failed to process file path '{content_str}': {e}")
+            except Exception:
+                _LOGGER.exception(f"Failed to process file path '{content_str}'")
                 raise
 
         # For strings, we need to determine if it's a file path or content
@@ -162,11 +161,11 @@ class BidiComponentDefinition:
                         abs_path = os.path.abspath(os.path.join(caller_dir, content))
 
                     if not os.path.exists(abs_path):
-                        raise ValueError(f"File does not exist: {abs_path}")
+                        raise ValueError(f"File does not exist: {abs_path}")  # noqa: TRY301
 
                     return True, abs_path
-                except Exception as e:
-                    _LOGGER.error(f"Failed to process file path '{content}': {e}")
+                except Exception:
+                    _LOGGER.exception(f"Failed to process file path '{content}'")
                     raise
 
         # If we get here, it's content, not a path

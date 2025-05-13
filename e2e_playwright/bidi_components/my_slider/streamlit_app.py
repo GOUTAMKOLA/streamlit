@@ -11,10 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING, Callable
 
 import streamlit as st
+
+if TYPE_CHECKING:
+    from lib.streamlit.components.v2.bidi_component import BidiComponentState
 
 st.header("Custom slider component (no JS framework)")
 
@@ -26,7 +31,14 @@ with st.echo():
     if "value" not in st.session_state:
         st.session_state["value"] = 50
 
-    def custom_slider(label, min=0, max=100, value=None, callback=None, key=None):
+    def custom_slider(
+        label: str | None = None,
+        min: int = 0,
+        max: int = 100,
+        value: int | None = None,
+        callback: Callable | None = None,
+        key: str | None = None,
+    ) -> BidiComponentState:
         component_name = "sliderComponent"
 
         if value is None:

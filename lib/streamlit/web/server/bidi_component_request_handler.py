@@ -69,10 +69,8 @@ class BidiComponentRequestHandler(tornado.web.RequestHandler):
         try:
             with open(abspath, "rb") as file:
                 contents = file.read()
-        except OSError as e:
-            _LOGGER.error(
-                "BidiComponentRequestHandler: GET %s read error", abspath, exc_info=e
-            )
+        except OSError:
+            _LOGGER.exception("BidiComponentRequestHandler: GET %s read error", abspath)
             self.write("read error")
             self.set_status(404)
             return
