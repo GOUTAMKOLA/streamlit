@@ -299,11 +299,12 @@ const useHandleJsContent = ({
     }
   }, [
     componentId,
+    componentName,
+    containerRef,
     data,
     id,
     jsContent,
     jsSourcePath,
-    containerRef,
     setError,
     skip,
     widgetMgr,
@@ -338,8 +339,8 @@ const IsolatedComponent: FC = () => {
         mode: "open",
       })
       setIsShadowRootReady(true)
-    } catch (error) {
-      handleError(error, setError, "Failed to create shadow DOM")
+    } catch (err) {
+      handleError(err, setError, "Failed to create shadow DOM")
     }
   }, [id])
 

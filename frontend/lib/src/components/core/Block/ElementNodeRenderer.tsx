@@ -162,7 +162,7 @@ const StreamlitSyntaxHighlighter = lazy(
   () => import("~lib/components/elements/CodeBlock/StreamlitSyntaxHighlighter")
 )
 
-const BidiComponent = React.lazy(
+const BidiComponent = lazy(
   () => import("~lib/components/widgets/BidiComponent")
 )
 
