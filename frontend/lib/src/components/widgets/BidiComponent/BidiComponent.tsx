@@ -192,11 +192,11 @@ const useHandleHtmlAndCssContent = ({
 }
 
 const useHandleJsContent = ({
-  parentRef,
+  containerRef,
   setError,
   skip = false,
 }: {
-  parentRef: React.RefObject<HTMLElement | ShadowRoot>
+  containerRef: React.RefObject<HTMLElement | ShadowRoot>
   setError: (error: Error) => void
   skip?: boolean
 }): void => {
@@ -206,7 +206,7 @@ const useHandleJsContent = ({
     useRequiredContext(BidiComponentContext)
 
   useEffect(() => {
-    if (skip || (!jsContent && !jsSourcePath) || !parentRef.current) {
+    if (skip || (!jsContent && !jsSourcePath) || !containerRef.current) {
       return
     }
 
@@ -228,7 +228,7 @@ const useHandleJsContent = ({
             componentName,
             moduleUrl: dataUri,
             componentId,
-            parentElement: parentRef.current!,
+            parentElement: containerRef.current!,
             data: parsedData,
             componentIdForWidgetMgr: id,
             widgetMgr,
@@ -258,7 +258,7 @@ const useHandleJsContent = ({
               componentName,
               moduleUrl: scriptUrl,
               componentId,
-              parentElement: parentRef.current!,
+              parentElement: containerRef.current!,
               data: parsedData,
               componentIdForWidgetMgr: id,
               widgetMgr,
@@ -303,7 +303,7 @@ const useHandleJsContent = ({
     id,
     jsContent,
     jsSourcePath,
-    parentRef,
+    containerRef,
     setError,
     skip,
     widgetMgr,
@@ -343,19 +343,10 @@ const IsolatedComponent: FC = () => {
     }
   }, [id])
 
-  const shouldSkipContent = !isShadowRootReady || !!error
+  const skip = !isShadowRootReady || !!error
 
-  useHandleHtmlAndCssContent({
-    containerRef: shadowRootRef,
-    setError,
-    skip: shouldSkipContent,
-  })
-
-  useHandleJsContent({
-    parentRef: shadowRootRef,
-    setError,
-    skip: shouldSkipContent,
-  })
+  useHandleHtmlAndCssContent({ containerRef: shadowRootRef, setError, skip })
+  useHandleJsContent({ containerRef: shadowRootRef, setError, skip })
 
   if (error) {
     return (
@@ -374,9 +365,10 @@ const NonIsolatedComponent: FC = () => {
   const containerRef = useRef<HTMLDivElement>(null)
   const [error, setError] = useState<Error | null>(null)
 
-  useHandleHtmlAndCssContent({ containerRef, setError, skip: !!error })
+  const skip = !!error
 
-  useHandleJsContent({ parentRef: containerRef, setError, skip: !!error })
+  useHandleHtmlAndCssContent({ containerRef, setError, skip })
+  useHandleJsContent({ containerRef, setError, skip })
 
   if (error) {
     return (
