@@ -77,10 +77,14 @@ class BidiComponentSerde:
             if isinstance(ui_value, dict):
                 deserialized_value = ui_value
             elif ui_value is not None:
-                deserialized_value = json.loads(ui_value)
+                if isinstance(ui_value, (int, float, bool)):
+                    deserialized_value = ui_value
+                else:
+                    deserialized_value = json.loads(ui_value)
             else:
                 deserialized_value = None
         except Exception:
+            # TODO: Should we raise an error here? Should we let the user know?
             deserialized_value = None
 
         state: BidiComponentState = {"value": deserialized_value}

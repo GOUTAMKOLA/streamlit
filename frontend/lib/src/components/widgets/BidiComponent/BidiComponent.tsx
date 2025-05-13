@@ -130,6 +130,7 @@ type ComponentResult = {
   cleanup?: () => void
 }
 
+// TODO: Expose this so that component authors can use it.
 type StComponentV2Args = {
   name: string
   data: unknown
@@ -173,7 +174,6 @@ const loadAndRunModule = async ({
     // TODO: FIXME:
     childContainerIDs: [],
     onChange: (value: unknown) => {
-      // TODO: We will need to make this generic so that it supports not only JSON values
       widgetMgr.setJsonValue(
         { id: componentIdForWidgetMgr },
         value,
