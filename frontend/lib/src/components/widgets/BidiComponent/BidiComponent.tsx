@@ -22,6 +22,7 @@ import type { BidiComponent as BidiComponentProto } from "@streamlit/protobuf"
 
 import type { WidgetStateManager } from "src/WidgetStateManager"
 import ErrorElement from "~lib/components/shared/ErrorElement"
+import type { ComponentResult, StBidiComponentV2Args } from "./types"
 
 const LOG = getLogger("BidiComponent")
 
@@ -126,20 +127,6 @@ const useHandleHtmlAndCssContent = ({
   return contentRef
 }
 
-type ComponentResult = {
-  cleanup?: () => void
-}
-
-// TODO: Expose this so that component authors can use it.
-type StComponentV2Args = {
-  name: string
-  data: unknown
-  key: string
-  parentElement: HTMLElement | ShadowRoot
-  childContainerIDs: string[]
-  onChange: (value: unknown) => void
-}
-
 const loadAndRunModule = async ({
   componentId,
   componentIdForWidgetMgr,
@@ -181,7 +168,7 @@ const loadAndRunModule = async ({
         undefined
       )
     },
-  })
+  } satisfies StBidiComponentV2Args)
 
   return {
     cleanup: typeof cleanup === "function" ? cleanup : undefined,
