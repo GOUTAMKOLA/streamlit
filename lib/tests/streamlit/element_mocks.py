@@ -155,15 +155,6 @@ WIDGET_ELEMENTS: list[tuple[str, ELEMENT_PRODUCER]] = [
             selection_mode="single-object",
         ),
     ),
-    (
-        "bidi_component",
-        lambda: st.bidi_component(
-            "test",
-            html="<div>Hello</div>",
-            css="div { color: red; }",
-            js="console.log('Hello');",
-        ),
-    ),
 ]
 
 NON_WIDGET_ELEMENTS: list[tuple[str, ELEMENT_PRODUCER]] = [
