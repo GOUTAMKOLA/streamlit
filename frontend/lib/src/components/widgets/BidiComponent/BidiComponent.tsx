@@ -14,7 +14,15 @@
  * limitations under the License.
  */
 
-import React, { FC, memo, useEffect, useId, useRef, useState } from "react"
+import React, {
+  FC,
+  memo,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 
 import { getLogger } from "loglevel"
 
@@ -23,9 +31,15 @@ import type { BidiComponent as BidiComponentProto } from "@streamlit/protobuf"
 import type { WidgetStateManager } from "src/WidgetStateManager"
 import ErrorElement from "~lib/components/shared/ErrorElement"
 import type { ComponentResult, StBidiComponentV2Args } from "./types"
+import {
+  BidiComponentContext,
+  BidiComponentContextShape,
+} from "./BidiComponentContext"
+import { useRequiredContext } from "~lib/hooks/useRequiredContext"
 
 const LOG = getLogger("BidiComponent")
 
+// TODO: This should probably be wired through `StreamlitEndpoints`
 const getUrlForSourcePath = (sourcePath: string): string => {
   return `/bidi_components/${sourcePath}`
 }
@@ -62,20 +76,20 @@ const handleError = (
 
 const useHandleHtmlAndCssContent = ({
   containerRef,
-  cssContent,
-  cssSourcePath,
-  html,
   setError,
   skip = false,
 }: {
   containerRef: React.RefObject<HTMLElement | ShadowRoot>
-  cssContent: string | undefined
-  cssSourcePath: string | undefined
-  html: string | undefined
   setError: (error: Error) => void
   skip?: boolean
 }): React.MutableRefObject<HTMLDivElement | null> => {
   const contentRef = useRef<HTMLDivElement | null>(null)
+
+  const {
+    htmlContent: html,
+    cssContent,
+    cssSourcePath,
+  } = useRequiredContext(BidiComponentContext)
 
   useEffect(() => {
     if (skip) {
@@ -179,27 +193,18 @@ const loadAndRunModule = async ({
 }
 
 const useHandleJsContent = ({
-  componentName,
-  data,
-  id,
-  jsContent,
-  jsSourcePath,
   parentRef,
   setError,
   skip = false,
-  widgetMgr,
 }: {
-  componentName: string
-  data: string | undefined
-  id: string
-  jsContent: string | undefined
-  jsSourcePath: string | undefined
   parentRef: React.RefObject<HTMLElement | ShadowRoot>
   setError: (error: Error) => void
   skip?: boolean
-  widgetMgr: WidgetStateManager
 }): void => {
   const componentId = `st-bidi-component-${useId()}`
+
+  const { componentName, data, id, jsContent, jsSourcePath, widgetMgr } =
+    useRequiredContext(BidiComponentContext)
 
   useEffect(() => {
     if (skip || (!jsContent && !jsSourcePath) || !parentRef.current) {
@@ -306,37 +311,19 @@ const useHandleJsContent = ({
   ])
 }
 
-interface ComponentBaseProps {
-  componentName: string
-  id: string
-  htmlContent: string | undefined
-  cssContent: string | undefined
-  cssSourcePath: string | undefined
-  jsContent: string | undefined
-  jsSourcePath: string | undefined
-  data: string | undefined
-  widgetMgr: WidgetStateManager
-}
-
-const IsolatedComponent: FC<ComponentBaseProps> = ({
-  componentName,
-  id,
-  htmlContent,
-  cssContent,
-  cssSourcePath,
-  jsContent,
-  jsSourcePath,
-  data,
-  widgetMgr,
-}) => {
+const IsolatedComponent: FC = () => {
   const containerRef = useRef<HTMLDivElement>(null)
   const shadowRootRef = useRef<ShadowRoot | null>(null)
   const [isShadowRootReady, setIsShadowRootReady] = useState(false)
   const [error, setError] = useState<Error | null>(null)
 
+  const { id } = useRequiredContext(BidiComponentContext)
+
   // Set up Shadow DOM
   useEffect(() => {
-    if (!containerRef.current) return
+    if (!containerRef.current) {
+      return
+    }
 
     try {
       // Don't try to attach a shadow root if the element already has one
@@ -359,23 +346,14 @@ const IsolatedComponent: FC<ComponentBaseProps> = ({
 
   useHandleHtmlAndCssContent({
     containerRef: shadowRootRef,
-    cssContent,
-    cssSourcePath,
-    html: htmlContent,
     setError,
     skip: shouldSkipContent,
   })
 
   useHandleJsContent({
-    componentName,
-    data,
-    id,
-    jsContent,
-    jsSourcePath,
     parentRef: shadowRootRef,
     setError,
     skip: shouldSkipContent,
-    widgetMgr,
   })
 
   if (error) {
@@ -391,40 +369,13 @@ const IsolatedComponent: FC<ComponentBaseProps> = ({
   return <div ref={containerRef} data-testid="stBidiComponent-isolated" />
 }
 
-const NonIsolatedComponent: FC<ComponentBaseProps> = ({
-  componentName,
-  cssContent,
-  cssSourcePath,
-  data,
-  htmlContent,
-  id,
-  jsContent,
-  jsSourcePath,
-  widgetMgr,
-}) => {
+const NonIsolatedComponent: FC = () => {
   const containerRef = useRef<HTMLDivElement>(null)
   const [error, setError] = useState<Error | null>(null)
 
-  useHandleHtmlAndCssContent({
-    containerRef,
-    cssContent,
-    cssSourcePath,
-    html: htmlContent,
-    setError,
-    skip: !!error,
-  })
+  useHandleHtmlAndCssContent({ containerRef, setError, skip: !!error })
 
-  useHandleJsContent({
-    componentName,
-    data,
-    id,
-    jsContent,
-    jsSourcePath,
-    parentRef: containerRef,
-    widgetMgr,
-    setError,
-    skip: !!error,
-  })
+  useHandleJsContent({ parentRef: containerRef, setError, skip: !!error })
 
   if (error) {
     return (
@@ -452,30 +403,36 @@ const BidiComponent: FC<BidiComponentProps> = ({ element, widgetMgr }) => {
     jsSourcePath,
   } = element
 
-  return isolateStyles ? (
-    <IsolatedComponent
-      componentName={componentName}
-      id={id}
-      htmlContent={htmlContent?.trim()}
-      cssContent={cssContent?.trim()}
-      cssSourcePath={cssSourcePath || undefined}
-      jsContent={jsContent || undefined}
-      jsSourcePath={jsSourcePath || undefined}
-      data={data}
-      widgetMgr={widgetMgr}
-    />
-  ) : (
-    <NonIsolatedComponent
-      componentName={componentName}
-      id={id}
-      htmlContent={htmlContent?.trim()}
-      cssContent={cssContent?.trim()}
-      cssSourcePath={cssSourcePath || undefined}
-      jsContent={jsContent || undefined}
-      jsSourcePath={jsSourcePath || undefined}
-      data={data}
-      widgetMgr={widgetMgr}
-    />
+  const contextValue = useMemo<BidiComponentContextShape>(() => {
+    return {
+      componentName,
+      id,
+      htmlContent: htmlContent?.trim(),
+      cssContent: cssContent?.trim(),
+      cssSourcePath: cssSourcePath || undefined,
+      jsContent: jsContent || undefined,
+      jsSourcePath: jsSourcePath || undefined,
+      data: data || undefined,
+      widgetMgr,
+    }
+  }, [
+    componentName,
+    id,
+    htmlContent,
+    cssContent,
+    cssSourcePath,
+    jsContent,
+    jsSourcePath,
+    data,
+    widgetMgr,
+  ])
+
+  return (
+    <>
+      <BidiComponentContext.Provider value={contextValue}>
+        {isolateStyles ? <IsolatedComponent /> : <NonIsolatedComponent />}
+      </BidiComponentContext.Provider>
+    </>
   )
 }
 
