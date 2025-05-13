@@ -59,9 +59,10 @@ class BidiComponentRequestHandler(tornado.web.RequestHandler):
         component_root = os.path.realpath(component_path)
         filename = "/".join(parts[1:])
         abspath = os.path.normpath(os.path.join(component_root, filename))
+        abspath = os.path.realpath(abspath)
 
         # Do NOT expose anything outside of the component root.
-        if os.path.commonpath([component_root, abspath]) != component_root:
+        if not abspath.startswith(component_root):
             self.write("forbidden")
             self.set_status(403)
             return
@@ -70,7 +71,10 @@ class BidiComponentRequestHandler(tornado.web.RequestHandler):
             with open(abspath, "rb") as file:
                 contents = file.read()
         except OSError:
-            _LOGGER.exception("BidiComponentRequestHandler: GET %s read error", abspath)
+            sanitized_abspath = abspath.replace("\n", "").replace("\r", "")
+            _LOGGER.exception(
+                "BidiComponentRequestHandler: GET %s read error", sanitized_abspath
+            )
             self.write("read error")
             self.set_status(404)
             return
