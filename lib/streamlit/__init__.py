@@ -171,7 +171,6 @@ audio_input = _main.audio_input
 badge = _main.badge
 balloons = _main.balloons
 bar_chart = _main.bar_chart
-# Expose the bidi_component method from the DeltaGenerator mixin
 # TODO: Determine the final, stable component name
 bidi_component = _main.bidi_component
 bokeh_chart = _main.bokeh_chart

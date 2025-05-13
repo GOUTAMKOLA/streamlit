@@ -84,12 +84,8 @@ class BidiComponentDefinitionTest(unittest.TestCase):
             self.assertIsNone(comp.js_content)  # JS content is None because it's a path
 
             # Check URLs are generated for path resources
-            self.assertEqual(
-                comp.css_url, f"bidi_components/test/{os.path.basename(self.css_path)}"
-            )
-            self.assertEqual(
-                comp.js_url, f"bidi_components/test/{os.path.basename(self.js_path)}"
-            )
+            self.assertEqual(comp.css_url, f"test/{os.path.basename(self.css_path)}")
+            self.assertEqual(comp.js_url, f"test/{os.path.basename(self.js_path)}")
 
             # Check source paths
             self.assertEqual(len(comp.source_paths), 2)
@@ -118,9 +114,7 @@ class BidiComponentDefinitionTest(unittest.TestCase):
 
             # Check URLs
             self.assertIsNone(comp.css_url)  # No URL for inline CSS
-            self.assertEqual(
-                comp.js_url, f"bidi_components/test/{os.path.basename(self.js_path)}"
-            )
+            self.assertEqual(comp.js_url, f"test/{os.path.basename(self.js_path)}")
 
             # Only JS should have a source path
             self.assertEqual(len(comp.source_paths), 1)
@@ -142,7 +136,7 @@ class BidiComponentDefinitionTest(unittest.TestCase):
             )
 
             self.assertIsNone(comp.js_content)  # JS content is None because it's a path
-            self.assertEqual(comp.js_url, f"bidi_components/test/{js_pathlib.name}")
+            self.assertEqual(comp.js_url, f"test/{js_pathlib.name}")
             self.assertEqual(comp.source_paths["js"], os.path.dirname(self.js_path))
 
 
