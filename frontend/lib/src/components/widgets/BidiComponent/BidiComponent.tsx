@@ -28,25 +28,22 @@ import { getLogger } from "loglevel"
 
 import type { BidiComponent as BidiComponentProto } from "@streamlit/protobuf"
 
-import type { WidgetStateManager } from "src/WidgetStateManager"
+import type { WidgetStateManager } from "~lib/WidgetStateManager"
 import ErrorElement from "~lib/components/shared/ErrorElement"
-import type { ComponentResult, StBidiComponentV2Args } from "./types"
+import { useRequiredContext } from "~lib/hooks/useRequiredContext"
+
 import {
   BidiComponentContext,
   BidiComponentContextShape,
 } from "./BidiComponentContext"
-import { useRequiredContext } from "~lib/hooks/useRequiredContext"
+import type { ComponentResult, StBidiComponentV2Args } from "./types"
 
+//#region Utility functions
 const LOG = getLogger("BidiComponent")
 
 // TODO: This should probably be wired through `StreamlitEndpoints`
 const getUrlForSourcePath = (sourcePath: string): string => {
   return `/bidi_components/${sourcePath}`
-}
-
-export type BidiComponentProps = {
-  element: BidiComponentProto
-  widgetMgr: WidgetStateManager
 }
 
 /**
@@ -74,6 +71,59 @@ const handleError = (
   setError(normalizedError)
 }
 
+const loadAndRunModule = async ({
+  componentId,
+  componentIdForWidgetMgr,
+  componentName,
+  data,
+  moduleUrl,
+  parentElement,
+  widgetMgr,
+}: {
+  componentId: string
+  componentIdForWidgetMgr: string
+  componentName: string
+  data: unknown
+  moduleUrl: string
+  parentElement: HTMLElement | ShadowRoot
+  widgetMgr: WidgetStateManager
+}): Promise<ComponentResult> => {
+  const module = await import(/* @vite-ignore */ moduleUrl)
+
+  if (!module) {
+    throw new Error("JS module does not exist.")
+  }
+
+  if (!module.default || typeof module.default !== "function") {
+    throw new Error("JS module does not have a default export function.")
+  }
+
+  const cleanup = module.default({
+    name: componentName,
+    data,
+    // TODO: We should not pass `key`, since React gives a warning, since `key`
+    // is a reserved prop.
+    key: componentId,
+    parentElement,
+    // TODO: FIXME:
+    childContainerIDs: [],
+    onChange: (value: unknown) => {
+      widgetMgr.setJsonValue(
+        { id: componentIdForWidgetMgr },
+        value,
+        { fromUi: true },
+        undefined
+      )
+    },
+  } satisfies StBidiComponentV2Args)
+
+  return {
+    cleanup: typeof cleanup === "function" ? cleanup : undefined,
+  }
+}
+//#endregion
+
+//#region Hooks
 const useHandleHtmlAndCssContent = ({
   containerRef,
   setError,
@@ -139,57 +189,6 @@ const useHandleHtmlAndCssContent = ({
   }, [html, cssContent, containerRef, cssSourcePath, setError, skip])
 
   return contentRef
-}
-
-const loadAndRunModule = async ({
-  componentId,
-  componentIdForWidgetMgr,
-  componentName,
-  data,
-  moduleUrl,
-  parentElement,
-  widgetMgr,
-}: {
-  componentId: string
-  componentIdForWidgetMgr: string
-  componentName: string
-  data: unknown
-  moduleUrl: string
-  parentElement: HTMLElement | ShadowRoot
-  widgetMgr: WidgetStateManager
-}): Promise<ComponentResult> => {
-  const module = await import(/* @vite-ignore */ moduleUrl)
-
-  if (!module) {
-    throw new Error("JS module does not exist.")
-  }
-
-  if (!module.default || typeof module.default !== "function") {
-    throw new Error("JS module does not have a default export function.")
-  }
-
-  const cleanup = module.default({
-    name: componentName,
-    data,
-    // TODO: We should not pass `key`, since React gives a warning, since `key`
-    // is a reserved prop.
-    key: componentId,
-    parentElement,
-    // TODO: FIXME:
-    childContainerIDs: [],
-    onChange: (value: unknown) => {
-      widgetMgr.setJsonValue(
-        { id: componentIdForWidgetMgr },
-        value,
-        { fromUi: true },
-        undefined
-      )
-    },
-  } satisfies StBidiComponentV2Args)
-
-  return {
-    cleanup: typeof cleanup === "function" ? cleanup : undefined,
-  }
 }
 
 const useHandleJsContent = ({
@@ -310,7 +309,9 @@ const useHandleJsContent = ({
     widgetMgr,
   ])
 }
+//#endregion
 
+//#region Internal components
 const IsolatedComponent: FC = () => {
   const containerRef = useRef<HTMLDivElement>(null)
   const shadowRootRef = useRef<ShadowRoot | null>(null)
@@ -388,6 +389,12 @@ const NonIsolatedComponent: FC = () => {
   }
 
   return <div ref={containerRef} data-testid="stBidiComponent-regular" />
+}
+//#endregion
+
+type BidiComponentProps = {
+  element: BidiComponentProto
+  widgetMgr: WidgetStateManager
 }
 
 const BidiComponent: FC<BidiComponentProps> = ({ element, widgetMgr }) => {
