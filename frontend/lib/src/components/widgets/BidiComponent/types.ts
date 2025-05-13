@@ -15,13 +15,13 @@
  */
 
 // TODO: Expose this so that component authors can use it.
-export type StBidiComponentV2Args = {
-  name: string
-  data: unknown
-  key: string
-  parentElement: HTMLElement | ShadowRoot
+export type StBidiComponentV2Args<DataShape = unknown, Value = unknown> = {
   childContainerIDs: string[]
-  onChange: (value: unknown) => void
+  data: DataShape
+  key: string
+  name: string
+  onChange: (value: Value) => void
+  parentElement: HTMLElement | ShadowRoot
 }
 
 export type ComponentResult = {
