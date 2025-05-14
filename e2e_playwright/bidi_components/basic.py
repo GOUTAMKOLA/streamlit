@@ -197,13 +197,11 @@ div {
     )
 
     st.write(f"Result: {result}")
-    if st.session_state.last_on_change_processed:
-        st.write(
-            f"Last on_change callback processed at: {st.session_state.last_on_change_processed}"
-        )
-    if st.session_state.last_on_click_processed:
-        st.write(
-            f"Last on_click callback processed at: {st.session_state.last_on_click_processed}"
-        )
+    st.write(
+        f"Last on_change callback processed at: {st.session_state.last_on_change_processed}"
+    )
+    st.write(
+        f"Last on_click callback processed at: {st.session_state.last_on_click_processed}"
+    )
 
     st.write(f"Click count: {st.session_state.click_count}")
