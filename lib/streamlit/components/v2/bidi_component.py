@@ -181,6 +181,18 @@ class BidiComponentMixin:
             form_id=current_form_id(self.dg),
         )
 
+        handlers: dict[str, WidgetCallback] = {}
+        if callable(on_change):
+            handlers["change"] = on_change
+
+        # Example for other handlers like on_click from kwargs
+        # We can make this more robust or configurable if needed.
+        for kwarg_key, kwarg_value in kwargs.items():
+            if kwarg_key.startswith("on_") and callable(kwarg_value):
+                event_name = kwarg_key[3:]  # remove "on_"
+                if event_name:  # Ensure we have an event name
+                    handlers[event_name] = kwarg_value
+
         # TODO: Add arg checking to ensure we have
         # - (JS content or JS source path) OR (HTML content) OR BOTH
 
@@ -198,6 +210,8 @@ class BidiComponentMixin:
         bidi_component_proto.data = json.dumps(data) if data else ""
         bidi_component_proto.child_container_count = child_container_count
         bidi_component_proto.form_id = current_form_id(self.dg)
+        if handlers:
+            bidi_component_proto.registered_handler_names.extend(handlers.keys())
 
         # Instantiate the Serde for this component instance
         serde = BidiComponentSerde()
@@ -207,7 +221,7 @@ class BidiComponentMixin:
             deserializer=serde.deserialize,
             serializer=serde.serialize,
             ctx=ctx,
-            on_change_handler=on_change if callable(on_change) else None,
+            callbacks=handlers if handlers else None,
             value_type="json_value",
         )
 

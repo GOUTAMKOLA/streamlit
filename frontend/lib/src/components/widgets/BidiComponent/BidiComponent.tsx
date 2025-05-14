@@ -24,6 +24,7 @@ import React, {
   useState,
 } from "react"
 
+import capitalize from "lodash/capitalize"
 import { getLogger } from "loglevel"
 
 import type { BidiComponent as BidiComponentProto } from "@streamlit/protobuf"
@@ -36,7 +37,12 @@ import {
   BidiComponentContext,
   BidiComponentContextShape,
 } from "./BidiComponentContext"
-import type { ComponentResult, StBidiComponentV2Args } from "./types"
+import type {
+  ComponentResult,
+  OnHandlerKey,
+  OnHandlers,
+  StBidiComponentV2Args,
+} from "./types"
 
 //#region Utility functions
 const LOG = getLogger("BidiComponent")
@@ -78,6 +84,7 @@ const loadAndRunModule = async ({
   data,
   moduleUrl,
   parentElement,
+  registeredHandlerNames,
   widgetMgr,
 }: {
   componentId: string
@@ -86,6 +93,7 @@ const loadAndRunModule = async ({
   data: unknown
   moduleUrl: string
   parentElement: HTMLElement | ShadowRoot
+  registeredHandlerNames: string[]
   widgetMgr: WidgetStateManager
 }): Promise<ComponentResult> => {
   const module = await import(/* @vite-ignore */ moduleUrl)
@@ -98,6 +106,33 @@ const loadAndRunModule = async ({
     throw new Error("JS module does not have a default export function.")
   }
 
+  const handlers = registeredHandlerNames.reduce<OnHandlers>((acc, name) => {
+    const handlerName = `on${capitalize(name)}` as OnHandlerKey
+
+    acc[handlerName] = (value?: unknown) => {
+      LOG.debug(`BidiComponent: ${handlerName} called with value`, value)
+
+      if (handlerName === "onClick") {
+        widgetMgr.setTriggerValue(
+          { id: componentIdForWidgetMgr },
+          { fromUi: true },
+          undefined
+        )
+        return
+      }
+
+      widgetMgr.setJsonValue(
+        { id: componentIdForWidgetMgr },
+        value,
+        { fromUi: true },
+        // TODO: Support Fragments
+        undefined
+      )
+    }
+
+    return acc
+  }, {})
+
   const cleanup = module.default({
     name: componentName,
     data,
@@ -107,14 +142,7 @@ const loadAndRunModule = async ({
     parentElement,
     // TODO: FIXME:
     childContainerIDs: [],
-    onChange: (value: unknown) => {
-      widgetMgr.setJsonValue(
-        { id: componentIdForWidgetMgr },
-        value,
-        { fromUi: true },
-        undefined
-      )
-    },
+    ...handlers,
   } satisfies StBidiComponentV2Args)
 
   return {
@@ -202,8 +230,15 @@ const useHandleJsContent = ({
 }): void => {
   const componentId = `st-bidi-component-${useId()}`
 
-  const { componentName, data, id, jsContent, jsSourcePath, widgetMgr } =
-    useRequiredContext(BidiComponentContext)
+  const {
+    componentName,
+    data,
+    id,
+    jsContent,
+    jsSourcePath,
+    registeredHandlerNames,
+    widgetMgr,
+  } = useRequiredContext(BidiComponentContext)
 
   useEffect(() => {
     if (skip || (!jsContent && !jsSourcePath) || !containerRef.current) {
@@ -231,6 +266,7 @@ const useHandleJsContent = ({
             parentElement: containerRef.current!,
             data: parsedData,
             componentIdForWidgetMgr: id,
+            registeredHandlerNames,
             widgetMgr,
           })
 
@@ -261,6 +297,7 @@ const useHandleJsContent = ({
               parentElement: containerRef.current!,
               data: parsedData,
               componentIdForWidgetMgr: id,
+              registeredHandlerNames,
               widgetMgr,
             })
 
@@ -401,29 +438,32 @@ const BidiComponent: FC<BidiComponentProps> = ({ element, widgetMgr }) => {
     isolateStyles,
     jsContent,
     jsSourcePath,
+    registeredHandlerNames,
   } = element
 
   const contextValue = useMemo<BidiComponentContextShape>(() => {
     return {
       componentName,
-      id,
-      htmlContent: htmlContent?.trim(),
       cssContent: cssContent?.trim(),
       cssSourcePath: cssSourcePath || undefined,
+      data: data || undefined,
+      htmlContent: htmlContent?.trim(),
+      id,
       jsContent: jsContent || undefined,
       jsSourcePath: jsSourcePath || undefined,
-      data: data || undefined,
+      registeredHandlerNames,
       widgetMgr,
     }
   }, [
     componentName,
-    id,
-    htmlContent,
     cssContent,
     cssSourcePath,
+    data,
+    htmlContent,
+    id,
     jsContent,
     jsSourcePath,
-    data,
+    registeredHandlerNames,
     widgetMgr,
   ])
 

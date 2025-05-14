@@ -39,7 +39,7 @@ def register_widget(
     deserializer: WidgetDeserializer[T],
     serializer: WidgetSerializer[T],
     ctx: ScriptRunContext | None,
-    on_change_handler: WidgetCallback | None = None,
+    callbacks: dict[str, WidgetCallback] | None = None,
     args: WidgetArgs | None = None,
     kwargs: WidgetKwargs | None = None,
     value_type: ValueFieldName,
@@ -58,8 +58,8 @@ def register_widget(
         Called to convert a widget's value to its protobuf representation.
     ctx : ScriptRunContext or None
         Used to ensure uniqueness of widget IDs, and to look up widget values.
-    on_change_handler : WidgetCallback or None
-        An optional callback invoked when the widget's value changes.
+    callbacks : dict[str, WidgetCallback] or None
+        A dictionary of callbacks for different widget types.
     args : WidgetArgs or None
         args to pass to on_change_handler when invoked
     kwargs : WidgetKwargs or None
@@ -104,7 +104,7 @@ def register_widget(
         deserializer,
         serializer,
         value_type=value_type,
-        callback=on_change_handler,
+        callbacks=callbacks,
         callback_args=args,
         callback_kwargs=kwargs,
         fragment_id=ctx.current_fragment_id if ctx else None,

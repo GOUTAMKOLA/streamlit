@@ -108,7 +108,7 @@ with st.echo():
 export default function(component) {
   console.log("I am a bidi component", component)
 
-  const { parentElement, onChange } = component
+  const { parentElement, onChange, onClick } = component
 
   const form = parentElement.querySelector("form")
   const handleSubmit = (event) => {
@@ -123,9 +123,12 @@ export default function(component) {
 
   form.addEventListener("submit", handleSubmit)
 
+  parentElement.addEventListener("click", onClick, { capture: true })
+
   return () => {
     console.log("Cleaning up")
     form.removeEventListener("submit", handleSubmit)
+    parentElement.removeEventListener("click", onClick, { capture: true })
   }
 }
 """
@@ -154,6 +157,7 @@ div {
         key: str | None = None,
         data: Any | None = None,
         on_change: Callable | None = None,
+        on_click: Callable | None = None,
     ) -> BidiComponentState:
         out = st.components.v2.component(
             name="my_component",
@@ -164,22 +168,42 @@ div {
             key=key,
             data=data,
             on_change=on_change,
+            on_click=on_click,
         )
         return out
 
-    if "last_callback_time" not in st.session_state:
-        st.session_state.last_callback_time = None
+    if "click_count" not in st.session_state:
+        st.session_state.click_count = 0
+
+    if "last_on_click_processed" not in st.session_state:
+        st.session_state.last_on_click_processed = None
+
+    def handle_click():
+        st.session_state.click_count += 1
+        st.session_state.last_on_click_processed = time.strftime("%H:%M:%S")
+
+    if "last_on_change_processed" not in st.session_state:
+        st.session_state.last_on_change_processed = None
 
     def handle_change():
         print("Value changed")
-        st.session_state.last_callback_time = time.strftime("%H:%M:%S")
+        st.session_state.last_on_change_processed = time.strftime("%H:%M:%S")
 
     result = my_component(
         key="my_component_1",
         data={"label": "Some data from python"},
         on_change=handle_change,
+        on_click=handle_click,
     )
 
     st.write(f"Result: {result}")
-    if st.session_state.last_callback_time:
-        st.write(f"Last callback processed at: {st.session_state.last_callback_time}")
+    if st.session_state.last_on_change_processed:
+        st.write(
+            f"Last on_change callback processed at: {st.session_state.last_on_change_processed}"
+        )
+    if st.session_state.last_on_click_processed:
+        st.write(
+            f"Last on_click callback processed at: {st.session_state.last_on_click_processed}"
+        )
+
+    st.write(f"Click count: {st.session_state.click_count}")

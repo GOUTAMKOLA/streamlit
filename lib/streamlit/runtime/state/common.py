@@ -112,12 +112,17 @@ class WidgetMetadata(Generic[T]):
     serializer: WidgetSerializer[T] = field(repr=False)
     value_type: ValueFieldName
 
-    # An optional user-code callback invoked when the widget's value changes.
-    # Widget callbacks are called at the start of a script run, before the
+    # A dictionary of event names to user-code callbacks.
+    # These are invoked when the corresponding widget event occurs.
+    # Callbacks are called at the start of a script run, before the
     # body of the script is executed.
-    callback: WidgetCallback | None = None
-    callback_args: WidgetArgs | None = None
-    callback_kwargs: WidgetKwargs | None = None
+    callbacks: dict[str, WidgetCallback] | None = None
+    callback_args: WidgetArgs | None = (
+        None  # Assuming these might be general or handled per callback
+    )
+    callback_kwargs: WidgetKwargs | None = (
+        None  # Assuming these might be general or handled per callback
+    )
 
     fragment_id: str | None = None
 

@@ -238,14 +238,15 @@ class WStateTests(unittest.TestCase):
             deserializer=lambda x: str(x),
             serializer=lambda x: int(x),
             value_type="int_value",
-            callback=MagicMock(),
+            callbacks={"change": MagicMock()},
             callback_args=(1,),
             callback_kwargs={"y": 2},
         )
         self.wstates.widget_metadata["widget_id_1"] = metadata
         self.wstates.call_callback("widget_id_1")
 
-        metadata.callback.assert_called_once_with(1, y=2)
+        assert metadata.callbacks is not None
+        metadata.callbacks["change"].assert_called_once_with(1, y=2)
 
     def test_fragment_callback_warning(self):
         """Test that a warning is logged when modifying elements during a fragment callback."""

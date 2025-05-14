@@ -20,13 +20,14 @@ import { WidgetStateManager } from "~lib/WidgetStateManager"
 
 export type BidiComponentContextShape = {
   componentName: string
-  id: string
-  htmlContent: string | undefined
   cssContent: string | undefined
   cssSourcePath: string | undefined
+  data: string | undefined
+  htmlContent: string | undefined
+  id: string
   jsContent: string | undefined
   jsSourcePath: string | undefined
-  data: string | undefined
+  registeredHandlerNames: string[]
   widgetMgr: WidgetStateManager
 }
 

@@ -59,4 +59,6 @@ message BidiComponent {
     // repeated BidiComponentData special_args = 9;
     // The number of child containers this component has.
     int32 child_container_count = 11;
+    // The names of the event handlers registered in Python (e.g., "change", "click").
+    repeated string registered_handler_names = 12;
 }

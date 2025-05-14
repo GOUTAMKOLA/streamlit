@@ -651,7 +651,9 @@ class ButtonGroupCommandTests(DeltaGeneratorTestCase):
         widget_id = session_state.get_widget_states()[0].id
         metadata = session_state._new_widget_state.widget_metadata.get(widget_id)
         assert metadata is not None
-        assert metadata.callback is not None
+        assert metadata.callbacks is not None
+        assert "change" in metadata.callbacks
+        assert metadata.callbacks["change"] is not None
 
     @parameterized.expand(get_command_matrix([]))
     def test_option_starting_with_icon(self, command: Callable[..., None]):

@@ -22,6 +22,7 @@ from dataclasses import dataclass, field, replace
 from typing import (
     TYPE_CHECKING,
     Any,
+    Callable,
     Final,
     Union,
     cast,
@@ -265,8 +266,12 @@ class WStates(MutableMapping[str, Any]):
         if metadata is None:
             raise RuntimeError(f"Widget {widget_id} not found.")
 
-        callback = metadata.callback
-        if callback is None:
+        # Retrieve the 'change' callback specifically
+        change_callback = None
+        if metadata.callbacks and "change" in metadata.callbacks:
+            change_callback = metadata.callbacks["change"]
+
+        if change_callback is None:
             return
 
         args = metadata.callback_args or ()
@@ -275,10 +280,10 @@ class WStates(MutableMapping[str, Any]):
         ctx = get_script_run_ctx()
         if ctx and metadata.fragment_id is not None:
             ctx.in_fragment_callback = True
-            callback(*args, **kwargs)
+            change_callback(*args, **kwargs)
             ctx.in_fragment_callback = False
         else:
-            callback(*args, **kwargs)
+            change_callback(*args, **kwargs)
 
 
 def _missing_key_error_message(key: str) -> str:
@@ -571,18 +576,74 @@ class SessionState:
 
     def _call_callbacks(self) -> None:
         """Call any callback associated with each widget whose value
-        changed between the previous and current script runs.
+        changed between the previous and current script runs, or whose
+        trigger_value is set.
         """
         from streamlit.runtime.scriptrunner import RerunException
 
-        changed_widget_ids = [
-            wid for wid in self._new_widget_state if self._widget_changed(wid)
-        ]
-        for wid in changed_widget_ids:
-            try:
-                self._new_widget_state.call_callback(wid)
-            except RerunException:  # noqa: PERF203
-                st.warning("Calling st.rerun() within a callback is a no-op.")
+        # Iterate over a copy of keys in case callbacks modify underlying collections.
+        widget_ids_to_process = list(self._new_widget_state.states.keys())
+
+        for wid in widget_ids_to_process:
+            metadata = self._new_widget_state.widget_metadata.get(wid)
+            if not metadata or not metadata.callbacks:
+                continue
+
+            args = metadata.callback_args or ()
+            kwargs = metadata.callback_kwargs or {}
+
+            # Helper to execute a callback with fragment context handling
+            def execute_callback(
+                callback_fn: Callable,
+                metadata: WidgetMetadata[Any],
+                metadata_args: tuple[Any, ...],
+                metadata_kwargs: dict[str, Any],
+            ):
+                ctx = get_script_run_ctx()
+                if ctx and metadata.fragment_id is not None:
+                    ctx.in_fragment_callback = True
+                    callback_fn(*metadata_args, **metadata_kwargs)
+                    ctx.in_fragment_callback = False
+                else:
+                    callback_fn(*metadata_args, **metadata_kwargs)
+
+            # 1. Check for trigger-based callbacks (e.g., "click")
+            #    This requires getting the serialized protobuf state.
+            widget_proto_state = self._new_widget_state.get_serialized(wid)
+            if widget_proto_state and widget_proto_state.trigger_value:
+                click_callback = metadata.callbacks.get("click")
+                if click_callback:
+                    try:
+                        execute_callback(click_callback, metadata, args, kwargs)
+                    except RerunException:
+                        st.warning("Calling st.rerun() within a callback is a no-op.")
+
+            # 2. Check for value-changed based callbacks (e.g., "change")
+            #    _widget_changed compares the primary deserialized value against _old_state.
+            if self._widget_changed(wid):
+                change_callback = metadata.callbacks.get("change")
+                if change_callback:
+                    try:
+                        # Ensure we don't call the same callback instance twice if it was already
+                        # triggered by trigger_value (e.g. if "click" and "change" are the same function).
+                        # This check is subtle: if trigger_value was true AND _widget_changed is true,
+                        # and both 'click' and 'change' map to the same callback object,
+                        # it would have already been called by the block above.
+                        # If they map to *different* functions, both will be called if their
+                        # respective conditions (trigger_value set, primary value changed) are met.
+
+                        # A simple way to avoid double execution for the *same callback instance*:
+                        # If 'click' callback exists, was triggered, and is the same as 'change' callback.
+                        was_click_triggered_for_same_fn = (
+                            widget_proto_state
+                            and widget_proto_state.trigger_value
+                            and metadata.callbacks.get("click") == change_callback
+                        )
+
+                        if not was_click_triggered_for_same_fn:
+                            execute_callback(change_callback)
+                    except RerunException:
+                        st.warning("Calling st.rerun() within a callback is a no-op.")
 
     def _widget_changed(self, widget_id: str) -> bool:
         """True if the given widget's value changed between the previous
