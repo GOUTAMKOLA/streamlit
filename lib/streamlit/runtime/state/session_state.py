@@ -641,7 +641,7 @@ class SessionState:
                         )
 
                         if not was_click_triggered_for_same_fn:
-                            execute_callback(change_callback)
+                            execute_callback(change_callback, metadata, args, kwargs)
                     except RerunException:
                         st.warning("Calling st.rerun() within a callback is a no-op.")
 

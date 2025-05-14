@@ -205,3 +205,9 @@ div {
     )
 
     st.write(f"Click count: {st.session_state.click_count}")
+
+
+is_clicked = st.button("Click me")
+
+if is_clicked:
+    st.write("Button was clicked")

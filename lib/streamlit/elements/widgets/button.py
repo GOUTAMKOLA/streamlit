@@ -1059,7 +1059,7 @@ class ButtonMixin:
 
         button_state = register_widget(
             button_proto.id,
-            on_change_handler=on_click,
+            callbacks={"click": on_click},
             args=args,
             kwargs=kwargs,
             deserializer=serde.deserialize,

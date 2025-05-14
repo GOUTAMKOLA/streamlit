@@ -221,6 +221,8 @@ class BidiComponentMixin:
             deserializer=serde.deserialize,
             serializer=serde.serialize,
             ctx=ctx,
+            # TODO: We should probably preserve the `on_change_handler` for the
+            # other widgets for backwards compatibility.
             callbacks=handlers if handlers else None,
             value_type="json_value",
         )
