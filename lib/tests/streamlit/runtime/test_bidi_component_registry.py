@@ -46,8 +46,8 @@ class BidiComponentRegistryTest(unittest.TestCase):
         runtime = Runtime(config)
 
         # Verify that the BidiComponentRegistry is initialized
-        self.assertIsNotNone(runtime.bidi_component_registry)
-        self.assertIsInstance(runtime.bidi_component_registry, BidiComponentRegistry)
+        assert runtime.bidi_component_registry is not None
+        assert isinstance(runtime.bidi_component_registry, BidiComponentRegistry)
 
     @patch("streamlit.runtime.runtime.MediaFileManager", autospec=True)
     def test_custom_bidi_component_registry(self, mock_media_file_manager):
@@ -74,5 +74,5 @@ class BidiComponentRegistryTest(unittest.TestCase):
         runtime = Runtime(config)
 
         # Verify that our custom registry is used
-        self.assertIs(runtime.bidi_component_registry, custom_registry)
-        self.assertIsNotNone(runtime.bidi_component_registry.get("test_component"))
+        assert runtime.bidi_component_registry is custom_registry
+        assert runtime.bidi_component_registry.get("test_component") is not None

@@ -55,12 +55,12 @@ class BidiComponentDefinitionTest(unittest.TestCase):
             js="console.log('hello');",
         )
 
-        self.assertEqual(comp.html_content, "<div>Hello</div>")
-        self.assertEqual(comp.css_content, ".div { color: red; }")
-        self.assertEqual(comp.js_content, "console.log('hello');")
-        self.assertIsNone(comp.css_url)
-        self.assertIsNone(comp.js_url)
-        self.assertEqual(comp.source_paths, {})
+        assert comp.html_content == "<div>Hello</div>"
+        assert comp.css_content == ".div { color: red; }"
+        assert comp.js_content == "console.log('hello');"
+        assert comp.css_url is None
+        assert comp.js_url is None
+        assert comp.source_paths == {}
 
     def test_file_path_content(self) -> None:
         """Test component with file path content."""
@@ -77,21 +77,19 @@ class BidiComponentDefinitionTest(unittest.TestCase):
                 css=self.css_path,
             )
 
-            self.assertEqual(comp.html_content, "<div>Inline HTML</div>")
-            self.assertIsNone(
-                comp.css_content
-            )  # CSS content is None because it's a path
-            self.assertIsNone(comp.js_content)  # JS content is None because it's a path
+            assert comp.html_content == "<div>Inline HTML</div>"
+            assert comp.css_content is None  # CSS content is None because it's a path
+            assert comp.js_content is None  # JS content is None because it's a path
 
             # Check URLs are generated for path resources
-            self.assertEqual(comp.css_url, f"test/{os.path.basename(self.css_path)}")
-            self.assertEqual(comp.js_url, f"test/{os.path.basename(self.js_path)}")
+            assert comp.css_url == f"test/{os.path.basename(self.css_path)}"
+            assert comp.js_url == f"test/{os.path.basename(self.js_path)}"
 
             # Check source paths
-            self.assertEqual(len(comp.source_paths), 2)
-            self.assertEqual(comp.source_paths["css"], os.path.dirname(self.css_path))
-            self.assertEqual(comp.source_paths["js"], os.path.dirname(self.js_path))
-            self.assertNotIn("html", comp.source_paths)
+            assert len(comp.source_paths) == 2
+            assert comp.source_paths["css"] == os.path.dirname(self.css_path)
+            assert comp.source_paths["js"] == os.path.dirname(self.js_path)
+            assert "html" not in comp.source_paths
 
     def test_mixed_content(self) -> None:
         """Test component with mixed string and file content."""
@@ -108,17 +106,17 @@ class BidiComponentDefinitionTest(unittest.TestCase):
                 css="div { color: green; }",  # String
             )
 
-            self.assertEqual(comp.html_content, "<div>Inline HTML</div>")
-            self.assertEqual(comp.css_content, "div { color: green; }")
-            self.assertIsNone(comp.js_content)  # JS content is None because it's a path
+            assert comp.html_content == "<div>Inline HTML</div>"
+            assert comp.css_content == "div { color: green; }"
+            assert comp.js_content is None  # JS content is None because it's a path
 
             # Check URLs
-            self.assertIsNone(comp.css_url)  # No URL for inline CSS
-            self.assertEqual(comp.js_url, f"test/{os.path.basename(self.js_path)}")
+            assert comp.css_url is None  # No URL for inline CSS
+            assert comp.js_url == f"test/{os.path.basename(self.js_path)}"
 
             # Only JS should have a source path
-            self.assertEqual(len(comp.source_paths), 1)
-            self.assertEqual(comp.source_paths["js"], os.path.dirname(self.js_path))
+            assert len(comp.source_paths) == 1
+            assert comp.source_paths["js"] == os.path.dirname(self.js_path)
 
     def test_pathlib_path(self) -> None:
         """Test component with Path object."""
@@ -135,9 +133,9 @@ class BidiComponentDefinitionTest(unittest.TestCase):
                 js=js_pathlib,
             )
 
-            self.assertIsNone(comp.js_content)  # JS content is None because it's a path
-            self.assertEqual(comp.js_url, f"test/{js_pathlib.name}")
-            self.assertEqual(comp.source_paths["js"], os.path.dirname(self.js_path))
+            assert comp.js_content is None  # JS content is None because it's a path
+            assert comp.js_url == f"test/{js_pathlib.name}"
+            assert comp.source_paths["js"] == os.path.dirname(self.js_path)
 
 
 class BidiComponentRegistryTest(unittest.TestCase):
@@ -168,7 +166,7 @@ class BidiComponentRegistryTest(unittest.TestCase):
             )
 
             path = self.registry.get_component_path("test_component")
-            self.assertEqual(path, os.path.dirname(self.js_path))
+            assert path == os.path.dirname(self.js_path)
 
     def test_get_component_path_with_string_content(self) -> None:
         """Test get_component_path with a component using string content."""
@@ -180,12 +178,12 @@ class BidiComponentRegistryTest(unittest.TestCase):
         )
 
         path = self.registry.get_component_path("string_component")
-        self.assertIsNone(path)
+        assert path is None
 
     def test_get_component_path_nonexistent_component(self) -> None:
         """Test get_component_path with a nonexistent component."""
         path = self.registry.get_component_path("nonexistent")
-        self.assertIsNone(path)
+        assert path is None
 
 
 if __name__ == "__main__":

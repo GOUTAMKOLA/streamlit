@@ -42,9 +42,9 @@ def get_bidi_component_registry() -> BidiComponentRegistry:
 
     if Runtime.exists():
         return Runtime.instance().bidi_component_registry
-    else:
-        # Return a local registry when running without the streamlit runtime
-        return BidiComponentRegistry()
+
+    # Return a local registry when running without the streamlit runtime
+    return BidiComponentRegistry()
 
 
 def component(

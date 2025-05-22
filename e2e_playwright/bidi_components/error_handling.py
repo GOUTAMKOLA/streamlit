@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import streamlit as st
 
@@ -21,7 +22,7 @@ st.header("Custom Component with incorrect JS")
 
 with st.echo():
 
-    def incorrect_js_component():
+    def incorrect_js_component() -> Any:
         component_name = "incorrectJsComponent"
 
         out = st.components.v2.component(
@@ -43,7 +44,7 @@ st.header("Custom Component with incorrect CSS path")
 
 with st.echo():
 
-    def incorrect_css_path_component():
+    def incorrect_css_path_component() -> Any:
         component_name = "incorrectCssPathComponent"
 
         out = st.components.v2.component(
