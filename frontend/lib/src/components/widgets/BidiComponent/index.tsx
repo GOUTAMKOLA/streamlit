@@ -15,3 +15,5 @@
  */
 
 export { default } from "./BidiComponent"
+export { BidiComponentContext } from "./BidiComponentContext"
+export type { BidiComponentContextShape } from "./BidiComponentContext"
