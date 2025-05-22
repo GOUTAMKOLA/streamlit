@@ -138,9 +138,9 @@ const loadAndRunModule = async ({
   const cleanup = module.default({
     name: componentName,
     data,
-    // TODO: We should not pass `key`, since React gives a warning, since `key`
-    // is a reserved prop.
-    key: componentId,
+    // NOTE: We are using `stKey` instead of `key` because React gives a warning
+    // that it is a reserved prop.
+    stKey: componentId,
     parentElement,
     // TODO: FIXME:
     childContainerIDs: [],

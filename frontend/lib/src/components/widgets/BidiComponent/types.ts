@@ -28,9 +28,9 @@ export type StBidiComponentV2Args<
 > = OnHandlers<Value> & {
   childContainerIDs: string[]
   data: DataShape
-  key: string
   name: string
   parentElement: HTMLElement | ShadowRoot
+  stKey: string
 }
 
 export type ComponentResult = {
