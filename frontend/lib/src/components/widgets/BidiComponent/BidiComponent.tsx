@@ -110,10 +110,11 @@ const loadAndRunModule = async ({
     const handlerName = `on${capitalize(name)}` as OnHandlerKey
 
     acc[handlerName] = (value?: unknown) => {
+      // eslint-disable-next-line testing-library/no-debugging-utils
       LOG.debug(`BidiComponent: ${handlerName} called with value`, value)
 
       if (handlerName === "onClick") {
-        widgetMgr.setTriggerValue(
+        void widgetMgr.setTriggerValue(
           { id: componentIdForWidgetMgr },
           { fromUi: true },
           undefined
@@ -121,7 +122,7 @@ const loadAndRunModule = async ({
         return
       }
 
-      widgetMgr.setJsonValue(
+      void widgetMgr.setJsonValue(
         { id: componentIdForWidgetMgr },
         value,
         { fromUi: true },
@@ -316,7 +317,7 @@ const useHandleJsContent = ({
       }
     }
 
-    run()
+    void run()
 
     // Cleanup function
     return () => {
@@ -342,6 +343,7 @@ const useHandleJsContent = ({
     id,
     jsContent,
     jsSourcePath,
+    registeredHandlerNames,
     setError,
     skip,
     widgetMgr,
