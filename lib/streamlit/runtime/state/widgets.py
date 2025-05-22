@@ -40,6 +40,7 @@ def register_widget(
     serializer: WidgetSerializer[T],
     ctx: ScriptRunContext | None,
     callbacks: dict[str, WidgetCallback] | None = None,
+    on_change_handler: WidgetCallback | None = None,
     args: WidgetArgs | None = None,
     kwargs: WidgetKwargs | None = None,
     value_type: ValueFieldName,
@@ -60,6 +61,8 @@ def register_widget(
         Used to ensure uniqueness of widget IDs, and to look up widget values.
     callbacks : dict[str, WidgetCallback] or None
         A dictionary of callbacks for different widget types.
+    on_change_handler : WidgetCallback or None
+        An optional callback invoked when the widget's value changes.
     args : WidgetArgs or None
         args to pass to on_change_handler when invoked
     kwargs : WidgetKwargs or None
@@ -98,13 +101,18 @@ def register_widget(
         For both paths a widget return value is provided, allowing the widgets
         to be used in a non-streamlit setting.
     """
+    # Merge on_change_handler into callbacks for backward compatibility
+    merged_callbacks = callbacks.copy() if callbacks else {}
+    if on_change_handler is not None:
+        merged_callbacks["change"] = on_change_handler
+
     # Create the widget's updated metadata, and register it with session_state.
     metadata = WidgetMetadata(
         element_id,
         deserializer,
         serializer,
         value_type=value_type,
-        callbacks=callbacks,
+        callbacks=merged_callbacks if merged_callbacks else None,
         callback_args=args,
         callback_kwargs=kwargs,
         fragment_id=ctx.current_fragment_id if ctx else None,
