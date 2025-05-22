@@ -22,6 +22,7 @@ from streamlit.elements.lib.event_utils import AttributeDictionary
 from streamlit.elements.lib.form_utils import current_form_id
 from streamlit.elements.lib.policies import check_cache_replay_rules
 from streamlit.elements.lib.utils import compute_and_register_element_id, to_key
+from streamlit.errors import StreamlitAPIException
 
 # Assuming protos are compiled and BidiComponentInstance is available:
 from streamlit.proto.BidiComponent_pb2 import BidiComponent as BidiComponentProto
@@ -154,6 +155,8 @@ class BidiComponentMixin:
         ------
         ValueError
             If the component is not registered in the registry.
+        StreamlitAPIException
+            If the component does not have the required JavaScript or HTML content.
         """
         check_cache_replay_rules()
 
@@ -174,6 +177,17 @@ class BidiComponentMixin:
         if component_def is None:
             raise ValueError(f"Component '{component_name}' is not registered")
 
+        # Validate that the component has the required content
+        has_js = bool(component_def.js_content or component_def.js_url)
+        has_html = bool(component_def.html_content)
+
+        if not has_js and not has_html:
+            raise StreamlitAPIException(
+                f"Component '{component_name}' must have either JavaScript content "
+                "(js_content or js_url) or HTML content (html_content), or both. "
+                "Please ensure the component definition includes at least one of these."
+            )
+
         # Compute a unique ID for this component instance
         computed_id = compute_and_register_element_id(
             component_name,
@@ -192,9 +206,6 @@ class BidiComponentMixin:
                 event_name = kwarg_key[3:]  # remove "on_"
                 if event_name:  # Ensure we have an event name
                     handlers[event_name] = kwarg_value
-
-        # TODO: Add arg checking to ensure we have
-        # - (JS content or JS source path) OR (HTML content) OR BOTH
 
         # Set up the component proto
         bidi_component_proto = BidiComponentProto()
@@ -221,8 +232,6 @@ class BidiComponentMixin:
             deserializer=serde.deserialize,
             serializer=serde.serialize,
             ctx=ctx,
-            # TODO: We should probably preserve the `on_change_handler` for the
-            # other widgets for backwards compatibility.
             callbacks=handlers if handlers else None,
             value_type="json_value",
         )
