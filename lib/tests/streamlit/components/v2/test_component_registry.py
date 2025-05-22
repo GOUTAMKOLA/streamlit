@@ -82,8 +82,8 @@ class BidiComponentDefinitionTest(unittest.TestCase):
             assert comp.js_content is None  # JS content is None because it's a path
 
             # Check URLs are generated for path resources
-            assert comp.css_url == f"test/{os.path.basename(self.css_path)}"
-            assert comp.js_url == f"test/{os.path.basename(self.js_path)}"
+            assert comp.css_url == f"{os.path.basename(self.css_path)}"
+            assert comp.js_url == f"{os.path.basename(self.js_path)}"
 
             # Check source paths
             assert len(comp.source_paths) == 2
@@ -112,7 +112,7 @@ class BidiComponentDefinitionTest(unittest.TestCase):
 
             # Check URLs
             assert comp.css_url is None  # No URL for inline CSS
-            assert comp.js_url == f"test/{os.path.basename(self.js_path)}"
+            assert comp.js_url == f"{os.path.basename(self.js_path)}"
 
             # Only JS should have a source path
             assert len(comp.source_paths) == 1
@@ -134,7 +134,7 @@ class BidiComponentDefinitionTest(unittest.TestCase):
             )
 
             assert comp.js_content is None  # JS content is None because it's a path
-            assert comp.js_url == f"test/{js_pathlib.name}"
+            assert comp.js_url == f"{js_pathlib.name}"
             assert comp.source_paths["js"] == os.path.dirname(self.js_path)
 
 
