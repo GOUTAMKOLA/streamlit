@@ -170,6 +170,18 @@ const useHandleHtmlAndCssContent = ({
   } = useRequiredContext(BidiComponentContext)
 
   const { componentRegistry } = useContext(LibContext)
+  const { getBidiComponentURL } = componentRegistry
+
+  /**
+   * Calculate this in a useMemo to reduce unnecessary re-runs of the useEffect
+   */
+  const cssLinkHref = useMemo(() => {
+    if (!cssSourcePath) {
+      return undefined
+    }
+
+    return getBidiComponentURL(componentName, cssSourcePath)
+  }, [componentName, cssSourcePath, getBidiComponentURL])
 
   useEffect(() => {
     if (skip) {
@@ -202,15 +214,12 @@ const useHandleHtmlAndCssContent = ({
         const styleElement = document.createElement("style")
         styleElement.textContent = cssContent
         contentRef.current.appendChild(styleElement)
-      } else if (cssSourcePath) {
+      } else if (cssLinkHref) {
         const linkElement = document.createElement("link")
-        linkElement.href = componentRegistry.getBidiComponentURL(
-          componentName,
-          cssSourcePath
-        )
+        linkElement.href = cssLinkHref
         linkElement.rel = "stylesheet"
         linkElement.onerror = () => {
-          handleError(`Failed to load CSS from ${cssSourcePath}`, setError)
+          handleError(`Failed to load CSS from ${cssLinkHref}`, setError)
         }
         contentRef.current.appendChild(linkElement)
       }
@@ -224,7 +233,7 @@ const useHandleHtmlAndCssContent = ({
     componentRegistry,
     containerRef,
     cssContent,
-    cssSourcePath,
+    cssLinkHref,
     html,
     setError,
     skip,
@@ -257,8 +266,22 @@ const useHandleJsContent = ({
 
   const { componentRegistry } = useContext(LibContext)
 
+  const jsSourcePathUrl = useMemo(() => {
+    if (!jsSourcePath) {
+      return undefined
+    }
+    return componentRegistry.getBidiComponentURL(componentName, jsSourcePath)
+  }, [componentName, jsSourcePath, componentRegistry])
+
   useEffect(() => {
-    if (skip || (!jsContent && !jsSourcePath) || !containerRef.current) {
+    if (
+      // Skip if the hook is explicitly skipped
+      skip ||
+      // Skip if there is no JS content or source path
+      (!jsContent && !jsSourcePathUrl) ||
+      // Skip if the container ref is not available
+      !containerRef.current
+    ) {
       return
     }
 
@@ -291,11 +314,8 @@ const useHandleJsContent = ({
           cleanup = result.cleanup
         }
         // Handle external JS file
-        else if (jsSourcePath) {
-          const scriptUrl = componentRegistry.getBidiComponentURL(
-            componentName,
-            jsSourcePath
-          )
+        else if (jsSourcePathUrl) {
+          const scriptUrl = jsSourcePathUrl
 
           try {
             // Load the script
@@ -306,7 +326,9 @@ const useHandleJsContent = ({
               scriptElement.async = true
               scriptElement.onload = () => resolve()
               scriptElement.onerror = () =>
-                reject(new Error(`Failed to load script from ${jsSourcePath}`))
+                reject(
+                  new Error(`Failed to load script from ${jsSourcePathUrl}`)
+                )
               document.head.appendChild(scriptElement)
             })
 
@@ -327,7 +349,7 @@ const useHandleJsContent = ({
           } catch (error) {
             throw normalizeError(
               error,
-              `Failed to load or execute script from ${jsSourcePath}`
+              `Failed to load or execute script from ${jsSourcePathUrl}`
             )
           }
         }
@@ -365,7 +387,7 @@ const useHandleJsContent = ({
     fragmentId,
     id,
     jsContent,
-    jsSourcePath,
+    jsSourcePathUrl,
     registeredHandlerNames,
     setError,
     skip,
