@@ -17,6 +17,7 @@
 import React, {
   FC,
   memo,
+  useContext,
   useEffect,
   useId,
   useMemo,
@@ -32,6 +33,7 @@ import type { BidiComponent as BidiComponentProto } from "@streamlit/protobuf"
 import type { WidgetStateManager } from "~lib/WidgetStateManager"
 import ErrorElement from "~lib/components/shared/ErrorElement"
 import { useRequiredContext } from "~lib/hooks/useRequiredContext"
+import { LibContext } from "~lib/components/core/LibContext"
 
 import {
   BidiComponentContext,
@@ -46,11 +48,6 @@ import type {
 
 //#region Utility functions
 const LOG = getLogger("BidiComponent")
-
-// TODO: This should probably be wired through `StreamlitEndpoints`
-const getUrlForSourcePath = (sourcePath: string): string => {
-  return `/bidi_components/${sourcePath}`
-}
 
 /**
  * Normalize errors to a standard Error object
@@ -169,7 +166,10 @@ const useHandleHtmlAndCssContent = ({
     htmlContent: html,
     cssContent,
     cssSourcePath,
+    componentName,
   } = useRequiredContext(BidiComponentContext)
+
+  const { componentRegistry } = useContext(LibContext)
 
   useEffect(() => {
     if (skip) {
@@ -204,7 +204,10 @@ const useHandleHtmlAndCssContent = ({
         contentRef.current.appendChild(styleElement)
       } else if (cssSourcePath) {
         const linkElement = document.createElement("link")
-        linkElement.href = getUrlForSourcePath(cssSourcePath)
+        linkElement.href = componentRegistry.getBidiComponentURL(
+          componentName,
+          cssSourcePath
+        )
         linkElement.rel = "stylesheet"
         linkElement.onerror = () => {
           handleError(`Failed to load CSS from ${cssSourcePath}`, setError)
@@ -216,7 +219,16 @@ const useHandleHtmlAndCssContent = ({
     } catch (error) {
       handleError(error, setError, "Failed to process HTML/CSS content")
     }
-  }, [html, cssContent, containerRef, cssSourcePath, setError, skip])
+  }, [
+    componentName,
+    componentRegistry,
+    containerRef,
+    cssContent,
+    cssSourcePath,
+    html,
+    setError,
+    skip,
+  ])
 
   return contentRef
 }
@@ -242,6 +254,8 @@ const useHandleJsContent = ({
     registeredHandlerNames,
     widgetMgr,
   } = useRequiredContext(BidiComponentContext)
+
+  const { componentRegistry } = useContext(LibContext)
 
   useEffect(() => {
     if (skip || (!jsContent && !jsSourcePath) || !containerRef.current) {
@@ -278,7 +292,10 @@ const useHandleJsContent = ({
         }
         // Handle external JS file
         else if (jsSourcePath) {
-          const scriptUrl = getUrlForSourcePath(jsSourcePath)
+          const scriptUrl = componentRegistry.getBidiComponentURL(
+            componentName,
+            jsSourcePath
+          )
 
           try {
             // Load the script
@@ -342,6 +359,7 @@ const useHandleJsContent = ({
   }, [
     componentId,
     componentName,
+    componentRegistry,
     containerRef,
     data,
     fragmentId,
@@ -482,11 +500,9 @@ const BidiComponent: FC<BidiComponentProps> = ({
   ])
 
   return (
-    <>
-      <BidiComponentContext.Provider value={contextValue}>
-        {isolateStyles ? <IsolatedComponent /> : <NonIsolatedComponent />}
-      </BidiComponentContext.Provider>
-    </>
+    <BidiComponentContext.Provider value={contextValue}>
+      {isolateStyles ? <IsolatedComponent /> : <NonIsolatedComponent />}
+    </BidiComponentContext.Provider>
   )
 }
 

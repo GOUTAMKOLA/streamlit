@@ -34,7 +34,8 @@ def _get_caller_path() -> str:
     """Return the path of the caller's file."""
     # Get our stack frame.
     current_frame: FrameType | None = inspect.currentframe()
-    assert current_frame is not None
+    if current_frame is None:
+        raise RuntimeError("Unable to inspect current frame")
     # Get the stack frame of our calling function.
     caller_frame = current_frame.f_back
     # The caller of this function might itself be a helper function.
@@ -47,7 +48,8 @@ def _get_caller_path() -> str:
         else:
             break
 
-    assert caller_frame is not None
+    if caller_frame is None:
+        raise RuntimeError("Unable to find caller frame")
     file_path = inspect.getfile(caller_frame)
     return file_path
 
@@ -184,7 +186,7 @@ class BidiComponentDefinition:
             # It's a string path
             filename = os.path.basename(str(self.css))
 
-        return f"{self.name}/{filename}"
+        return f"{filename}"
 
     @property
     def js_url(self) -> str | None:
@@ -199,7 +201,7 @@ class BidiComponentDefinition:
             # It's a string path
             filename = os.path.basename(str(self.js))
 
-        return f"{self.name}/{filename}"
+        return f"{filename}"
 
     @property
     def css_content(self) -> str | None:

@@ -40,6 +40,7 @@ describe("FileUploadClient Upload", () => {
         sendClientErrorToHost: vi.fn(),
         checkSourceUrlResponse: vi.fn(),
         buildComponentURL: vi.fn(),
+        buildBidiComponentURL: vi.fn(),
         buildMediaURL: vi.fn(),
         buildFileUploadURL: vi.fn(),
         buildAppPageURL: vi.fn(),
