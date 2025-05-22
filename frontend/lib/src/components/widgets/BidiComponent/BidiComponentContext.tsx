@@ -23,6 +23,7 @@ export type BidiComponentContextShape = {
   cssContent: string | undefined
   cssSourcePath: string | undefined
   data: string | undefined
+  fragmentId: string | undefined
   htmlContent: string | undefined
   id: string
   jsContent: string | undefined

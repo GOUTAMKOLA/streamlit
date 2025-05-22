@@ -82,6 +82,7 @@ const loadAndRunModule = async ({
   componentIdForWidgetMgr,
   componentName,
   data,
+  fragmentId,
   moduleUrl,
   parentElement,
   registeredHandlerNames,
@@ -91,6 +92,7 @@ const loadAndRunModule = async ({
   componentIdForWidgetMgr: string
   componentName: string
   data: unknown
+  fragmentId: string | undefined
   moduleUrl: string
   parentElement: HTMLElement | ShadowRoot
   registeredHandlerNames: string[]
@@ -117,7 +119,7 @@ const loadAndRunModule = async ({
         void widgetMgr.setTriggerValue(
           { id: componentIdForWidgetMgr },
           { fromUi: true },
-          undefined
+          fragmentId
         )
         return
       }
@@ -126,8 +128,7 @@ const loadAndRunModule = async ({
         { id: componentIdForWidgetMgr },
         value,
         { fromUi: true },
-        // TODO: Support Fragments
-        undefined
+        fragmentId
       )
     }
 
@@ -234,6 +235,7 @@ const useHandleJsContent = ({
   const {
     componentName,
     data,
+    fragmentId,
     id,
     jsContent,
     jsSourcePath,
@@ -267,6 +269,7 @@ const useHandleJsContent = ({
             parentElement: containerRef.current!,
             data: parsedData,
             componentIdForWidgetMgr: id,
+            fragmentId,
             registeredHandlerNames,
             widgetMgr,
           })
@@ -298,6 +301,7 @@ const useHandleJsContent = ({
               parentElement: containerRef.current!,
               data: parsedData,
               componentIdForWidgetMgr: id,
+              fragmentId,
               registeredHandlerNames,
               widgetMgr,
             })
@@ -340,6 +344,7 @@ const useHandleJsContent = ({
     componentName,
     containerRef,
     data,
+    fragmentId,
     id,
     jsContent,
     jsSourcePath,
@@ -427,9 +432,14 @@ const NonIsolatedComponent: FC = () => {
 type BidiComponentProps = {
   element: BidiComponentProto
   widgetMgr: WidgetStateManager
+  fragmentId: string | undefined
 }
 
-const BidiComponent: FC<BidiComponentProps> = ({ element, widgetMgr }) => {
+const BidiComponent: FC<BidiComponentProps> = ({
+  element,
+  widgetMgr,
+  fragmentId,
+}) => {
   const {
     componentName,
     cssContent,
@@ -449,6 +459,7 @@ const BidiComponent: FC<BidiComponentProps> = ({ element, widgetMgr }) => {
       cssContent: cssContent?.trim(),
       cssSourcePath: cssSourcePath || undefined,
       data: data || undefined,
+      fragmentId,
       htmlContent: htmlContent?.trim(),
       id,
       jsContent: jsContent || undefined,
@@ -461,6 +472,7 @@ const BidiComponent: FC<BidiComponentProps> = ({ element, widgetMgr }) => {
     cssContent,
     cssSourcePath,
     data,
+    fragmentId,
     htmlContent,
     id,
     jsContent,
