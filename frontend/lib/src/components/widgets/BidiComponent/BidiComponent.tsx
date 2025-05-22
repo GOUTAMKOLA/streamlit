@@ -169,8 +169,9 @@ const useHandleHtmlAndCssContent = ({
     componentName,
   } = useRequiredContext(BidiComponentContext)
 
-  const { componentRegistry } = useContext(LibContext)
-  const { getBidiComponentURL } = componentRegistry
+  const {
+    componentRegistry: { getBidiComponentURL },
+  } = useContext(LibContext)
 
   /**
    * Calculate this in a useMemo to reduce unnecessary re-runs of the useEffect
@@ -228,16 +229,7 @@ const useHandleHtmlAndCssContent = ({
     } catch (error) {
       handleError(error, setError, "Failed to process HTML/CSS content")
     }
-  }, [
-    componentName,
-    componentRegistry,
-    containerRef,
-    cssContent,
-    cssLinkHref,
-    html,
-    setError,
-    skip,
-  ])
+  }, [html, cssContent, containerRef, cssLinkHref, setError, skip])
 
   return contentRef
 }
@@ -264,14 +256,16 @@ const useHandleJsContent = ({
     widgetMgr,
   } = useRequiredContext(BidiComponentContext)
 
-  const { componentRegistry } = useContext(LibContext)
+  const {
+    componentRegistry: { getBidiComponentURL },
+  } = useContext(LibContext)
 
   const jsSourcePathUrl = useMemo(() => {
     if (!jsSourcePath) {
       return undefined
     }
-    return componentRegistry.getBidiComponentURL(componentName, jsSourcePath)
-  }, [componentName, jsSourcePath, componentRegistry])
+    return getBidiComponentURL(componentName, jsSourcePath)
+  }, [componentName, jsSourcePath, getBidiComponentURL])
 
   useEffect(() => {
     if (
@@ -381,7 +375,6 @@ const useHandleJsContent = ({
   }, [
     componentId,
     componentName,
-    componentRegistry,
     containerRef,
     data,
     fragmentId,

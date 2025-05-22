@@ -14,7 +14,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 import streamlit as st
 
@@ -39,6 +39,7 @@ with st.echo():
         js: str | Path | None,
         html: str | None = None,
         css: str | Path | None = None,
+        on_change: Callable[[], None] | None = None,
     ) -> BidiComponentState:
         out = st.components.v2.component(
             name="my_component",
@@ -46,12 +47,22 @@ with st.echo():
             js=js,
             css=css,
             key="my_component_1",
+            on_change=on_change,
         )
 
         return out
+
+    if "submission_count" not in st.session_state:
+        st.session_state.submission_count = 0
+
+    def handle_change():
+        st.session_state.submission_count += 1
 
     my_component_with_paths(
         html=HTML_FORM,
         js=Path(__file__).parent / "index.js",
         css=Path(__file__).parent / "my_styles.css",
+        on_change=handle_change,
     )
+
+    st.write(f"Submission count: {st.session_state.submission_count}")
