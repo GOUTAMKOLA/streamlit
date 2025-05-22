@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Callable
 import streamlit as st
 
 if TYPE_CHECKING:
-    from lib.streamlit.components.v2.bidi_component import BidiComponentState
+    from streamlit.components.v2.bidi_component import BidiComponentState
 
 st.header("Custom slider component (no JS framework)")
 

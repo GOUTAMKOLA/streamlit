@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING
 import streamlit as st
 
 if TYPE_CHECKING:
-    from lib.streamlit.components.v2.bidi_component import BidiComponentState
+    from streamlit.components.v2.bidi_component import BidiComponentState
 
 with st.echo():
     HTML_FORM = """
