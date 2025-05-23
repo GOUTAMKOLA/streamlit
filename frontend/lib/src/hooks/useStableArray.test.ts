@@ -24,28 +24,10 @@ describe("#useStableArray", () => {
     it.each([
       ["numbers", [1, 2, 3]],
       ["single element", [42]],
+      ["strings", ["a", "b", "c"]],
+      ["empty array", []],
+      ["mixed types", [1, "a", true, null]],
     ])("should return a stable array for %s", (_, array) => {
-      const { result } = renderHook(() => useStableArray(array))
-      expect(result.current).toEqual(array)
-      expect(Array.isArray(result.current)).toBe(true)
-    })
-
-    it("should handle strings", () => {
-      const array = ["a", "b", "c"]
-      const { result } = renderHook(() => useStableArray(array))
-      expect(result.current).toEqual(array)
-      expect(Array.isArray(result.current)).toBe(true)
-    })
-
-    it("should handle empty array", () => {
-      const array: number[] = []
-      const { result } = renderHook(() => useStableArray(array))
-      expect(result.current).toEqual(array)
-      expect(Array.isArray(result.current)).toBe(true)
-    })
-
-    it("should handle mixed types", () => {
-      const array = [1, "a", true, null]
       const { result } = renderHook(() => useStableArray(array))
       expect(result.current).toEqual(array)
       expect(Array.isArray(result.current)).toBe(true)
@@ -234,7 +216,7 @@ describe("#useStableArray", () => {
     })
 
     it("should handle arrays with functions (which JSON.stringify ignores)", () => {
-      const func = () => {}
+      const func = (): void => {}
       const array = [1, func, 3]
 
       const { result } = renderHook(() => useStableArray(array))
