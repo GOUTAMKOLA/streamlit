@@ -34,6 +34,7 @@ import type { WidgetStateManager } from "~lib/WidgetStateManager"
 import ErrorElement from "~lib/components/shared/ErrorElement"
 import { useRequiredContext } from "~lib/hooks/useRequiredContext"
 import { LibContext } from "~lib/components/core/LibContext"
+import { useStableArray } from "~lib/hooks/useStableArray"
 
 import {
   BidiComponentContext,
@@ -92,7 +93,7 @@ const loadAndRunModule = async ({
   fragmentId: string | undefined
   moduleUrl: string
   parentElement: HTMLElement | ShadowRoot
-  registeredHandlerNames: string[]
+  registeredHandlerNames: readonly string[]
   widgetMgr: WidgetStateManager
 }): Promise<ComponentResult> => {
   const module = await import(/* @vite-ignore */ moduleUrl)
@@ -486,6 +487,9 @@ const BidiComponent: FC<BidiComponentProps> = ({
     registeredHandlerNames,
   } = element
 
+  // Stabilize registeredHandlerNames array to prevent unnecessary re-renders
+  const stableRegisteredHandlerNames = useStableArray(registeredHandlerNames)
+
   const contextValue = useMemo<BidiComponentContextShape>(() => {
     return {
       componentName,
@@ -497,7 +501,7 @@ const BidiComponent: FC<BidiComponentProps> = ({
       id,
       jsContent: jsContent || undefined,
       jsSourcePath: jsSourcePath || undefined,
-      registeredHandlerNames,
+      registeredHandlerNames: stableRegisteredHandlerNames,
       widgetMgr,
     }
   }, [
@@ -510,7 +514,7 @@ const BidiComponent: FC<BidiComponentProps> = ({
     id,
     jsContent,
     jsSourcePath,
-    registeredHandlerNames,
+    stableRegisteredHandlerNames,
     widgetMgr,
   ])
 

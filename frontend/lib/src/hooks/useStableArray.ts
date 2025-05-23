@@ -14,23 +14,20 @@
  * limitations under the License.
  */
 
-import { createContext } from "react"
+import { useMemo } from "react"
 
-import { WidgetStateManager } from "~lib/WidgetStateManager"
-
-export type BidiComponentContextShape = {
-  componentName: string
-  cssContent: string | undefined
-  cssSourcePath: string | undefined
-  data: string | undefined
-  fragmentId: string | undefined
-  htmlContent: string | undefined
-  id: string
-  jsContent: string | undefined
-  jsSourcePath: string | undefined
-  registeredHandlerNames: readonly string[]
-  widgetMgr: WidgetStateManager
+/**
+ * This hook returns a stable array.
+ *
+ * @param array - The array to return a stable version of.
+ * @returns A stable version of the array (frozen to prevent mutations).
+ */
+export const useStableArray = <T>(array: T[]): readonly T[] => {
+  return useMemo(() => {
+    return Object.freeze([...array])
+    // These eslint rules are disabled because we want to use the stringified
+    // version of the array as a cache key for the memoization.
+    // eslint-disable-next-line react-compiler/react-compiler
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(array)])
 }
-
-export const BidiComponentContext =
-  createContext<BidiComponentContextShape | null>(null)
