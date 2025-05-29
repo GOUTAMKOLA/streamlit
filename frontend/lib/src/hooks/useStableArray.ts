@@ -27,7 +27,7 @@ export const useStableArray = <T>(array: T[]): readonly T[] => {
     return Object.freeze([...array])
     // These eslint rules are disabled because we want to use the stringified
     // version of the array as a cache key for the memoization.
-    // eslint-disable-next-line react-compiler/react-compiler
+    // eslint-disable-next-line react-hooks/react-compiler
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(array)])
 }

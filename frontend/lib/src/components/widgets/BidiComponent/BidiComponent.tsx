@@ -110,7 +110,6 @@ const loadAndRunModule = async ({
     const handlerName = `on${capitalize(name)}` as OnHandlerKey
 
     acc[handlerName] = (value?: unknown) => {
-      // eslint-disable-next-line testing-library/no-debugging-utils
       LOG.debug(`BidiComponent: ${handlerName} called with value`, value)
 
       if (handlerName === "onClick") {
@@ -269,13 +268,15 @@ const useHandleJsContent = ({
   }, [componentName, jsSourcePath, getBidiComponentURL])
 
   useEffect(() => {
+    const { current: containerRefCurrent } = containerRef
+
     if (
       // Skip if the hook is explicitly skipped
       skip ||
       // Skip if there is no JS content or source path
       (!jsContent && !jsSourcePathUrl) ||
       // Skip if the container ref is not available
-      !containerRef.current
+      !containerRefCurrent
     ) {
       return
     }
@@ -298,7 +299,7 @@ const useHandleJsContent = ({
             componentName,
             moduleUrl: dataUri,
             componentId,
-            parentElement: containerRef.current!,
+            parentElement: containerRefCurrent,
             data: parsedData,
             componentIdForWidgetMgr: id,
             fragmentId,
@@ -332,7 +333,7 @@ const useHandleJsContent = ({
               componentName,
               moduleUrl: scriptUrl,
               componentId,
-              parentElement: containerRef.current!,
+              parentElement: containerRefCurrent,
               data: parsedData,
               componentIdForWidgetMgr: id,
               fragmentId,

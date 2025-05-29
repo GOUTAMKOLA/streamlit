@@ -24,7 +24,7 @@ export type OnHandlers<Value = unknown> = {
 // TODO: Expose this so that component authors can use it.
 export type StBidiComponentV2Args<
   DataShape = unknown,
-  Value = unknown
+  Value = unknown,
 > = OnHandlers<Value> & {
   childContainerIDs: string[]
   data: DataShape
