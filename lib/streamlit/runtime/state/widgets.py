@@ -63,6 +63,10 @@ def register_widget(
         A dictionary of callbacks for different widget types.
     on_change_handler : WidgetCallback or None
         An optional callback invoked when the widget's value changes.
+
+        .. deprecated::
+            Use `callbacks` parameter with key "change" instead.
+            This parameter will be removed in a future version.
     args : WidgetArgs or None
         args to pass to on_change_handler when invoked
     kwargs : WidgetKwargs or None

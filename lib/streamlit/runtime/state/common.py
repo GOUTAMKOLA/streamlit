@@ -117,12 +117,8 @@ class WidgetMetadata(Generic[T]):
     # Callbacks are called at the start of a script run, before the
     # body of the script is executed.
     callbacks: dict[str, WidgetCallback] | None = None
-    callback_args: WidgetArgs | None = (
-        None  # Assuming these might be general or handled per callback
-    )
-    callback_kwargs: WidgetKwargs | None = (
-        None  # Assuming these might be general or handled per callback
-    )
+    callback_args: WidgetArgs | None = None
+    callback_kwargs: WidgetKwargs | None = None
 
     fragment_id: str | None = None
 
