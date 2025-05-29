@@ -18,33 +18,16 @@ import inspect
 from typing import TYPE_CHECKING, Any
 
 from streamlit.components.v2.component_registry import BidiComponentDefinition
+from streamlit.components.v2.get_bidi_component_registry import (
+    get_bidi_component_registry,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
     from types import FrameType
 
     from streamlit.components.v2.bidi_component import BidiComponentState
-    from streamlit.components.v2.component_registry import BidiComponentRegistry
     from streamlit.runtime.state.common import WidgetCallback
-
-
-# TODO: Move this into somewhere that is not public
-def get_bidi_component_registry() -> BidiComponentRegistry:
-    """Returns the singleton BidiComponentRegistry instance.
-
-    Returns
-    -------
-    BidiComponentRegistry
-        The singleton BidiComponentRegistry instance.
-    """
-    from streamlit.components.v2.component_registry import BidiComponentRegistry
-    from streamlit.runtime import Runtime
-
-    if Runtime.exists():
-        return Runtime.instance().bidi_component_registry
-
-    # Return a local registry when running without the streamlit runtime
-    return BidiComponentRegistry()
 
 
 def component(
