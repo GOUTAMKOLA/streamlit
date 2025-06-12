@@ -98,7 +98,7 @@ class BidiComponentRequestHandler(tornado.web.RequestHandler):
             self.set_header("Cache-Control", "public")
 
     def set_default_headers(self) -> None:
-        if streamlit.web.server.routes.allow_cross_origin_requests():
+        if streamlit.web.server.routes.allow_all_cross_origin_requests():
             self.set_header("Access-Control-Allow-Origin", "*")
 
     def options(self) -> None:
