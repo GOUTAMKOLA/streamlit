@@ -18,7 +18,6 @@ import json
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, TypedDict, cast
 
-from streamlit.elements.lib.event_utils import AttributeDictionary
 from streamlit.elements.lib.form_utils import current_form_id
 from streamlit.elements.lib.policies import check_cache_replay_rules
 from streamlit.elements.lib.utils import compute_and_register_element_id, to_key
@@ -29,6 +28,7 @@ from streamlit.proto.BidiComponent_pb2 import BidiComponent as BidiComponentProt
 from streamlit.runtime.metrics_util import gather_metrics
 from streamlit.runtime.scriptrunner_utils.script_run_context import get_script_run_ctx
 from streamlit.runtime.state import register_widget
+from streamlit.util import AttributeDictionary
 
 if TYPE_CHECKING:
     # Define DeltaGenerator for type checking the dg property
