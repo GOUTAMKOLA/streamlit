@@ -25,7 +25,6 @@ import React, {
   useState,
 } from "react"
 
-import capitalize from "lodash/capitalize"
 import { getLogger } from "loglevel"
 
 import type { BidiComponent as BidiComponentProto } from "@streamlit/protobuf"
@@ -34,18 +33,12 @@ import type { WidgetStateManager } from "~lib/WidgetStateManager"
 import ErrorElement from "~lib/components/shared/ErrorElement"
 import { useRequiredContext } from "~lib/hooks/useRequiredContext"
 import { LibContext } from "~lib/components/core/LibContext"
-import { useStableArray } from "~lib/hooks/useStableArray"
 
 import {
   BidiComponentContext,
   BidiComponentContextShape,
 } from "./BidiComponentContext"
-import type {
-  ComponentResult,
-  OnHandlerKey,
-  OnHandlers,
-  StBidiComponentV2Args,
-} from "./types"
+import type { ComponentResult, StBidiComponentV2Args } from "./types"
 
 //#region Utility functions
 const LOG = getLogger("BidiComponent")
@@ -83,7 +76,6 @@ const loadAndRunModule = async ({
   fragmentId,
   moduleUrl,
   parentElement,
-  registeredHandlerNames,
   widgetMgr,
 }: {
   componentId: string
@@ -93,7 +85,6 @@ const loadAndRunModule = async ({
   fragmentId: string | undefined
   moduleUrl: string
   parentElement: HTMLElement | ShadowRoot
-  registeredHandlerNames: readonly string[]
   widgetMgr: WidgetStateManager
 }): Promise<ComponentResult> => {
   const module = await import(/* @vite-ignore */ moduleUrl)
@@ -106,31 +97,39 @@ const loadAndRunModule = async ({
     throw new Error("JS module does not have a default export function.")
   }
 
-  const handlers = registeredHandlerNames.reduce<OnHandlers>((acc, name) => {
-    const handlerName = `on${capitalize(name)}` as OnHandlerKey
+  // Create setStateValue and setTriggerValue functions for the new API
+  const setStateValue = <T = unknown,>(eventType: string, value: T): void => {
+    LOG.debug(
+      `BidiComponent: setStateValue called with eventType ${eventType} and value`,
+      value
+    )
 
-    acc[handlerName] = (value?: unknown) => {
-      LOG.debug(`BidiComponent: ${handlerName} called with value`, value)
+    void widgetMgr.setBidiComponentStateValue(
+      { id: componentIdForWidgetMgr },
+      eventType,
+      value,
+      { fromUi: true },
+      fragmentId
+    )
+  }
 
-      if (handlerName === "onClick") {
-        void widgetMgr.setTriggerValue(
-          { id: componentIdForWidgetMgr },
-          { fromUi: true },
-          fragmentId
-        )
-        return
-      }
+  const setTriggerValue = <T = unknown,>(
+    eventType: string,
+    value: T
+  ): void => {
+    LOG.debug(
+      `BidiComponent: setTriggerValue called with eventType ${eventType} and value`,
+      value
+    )
 
-      void widgetMgr.setJsonValue(
-        { id: componentIdForWidgetMgr },
-        value,
-        { fromUi: true },
-        fragmentId
-      )
-    }
-
-    return acc
-  }, {})
+    void widgetMgr.setBidiComponentTriggerValue(
+      { id: componentIdForWidgetMgr },
+      eventType,
+      value,
+      { fromUi: true },
+      fragmentId
+    )
+  }
 
   const cleanup = module.default({
     name: componentName,
@@ -139,9 +138,9 @@ const loadAndRunModule = async ({
     // that it is a reserved prop.
     stKey: componentId,
     parentElement,
-    // TODO: FIXME:
-    childContainerIDs: [],
-    ...handlers,
+    // New API functions for state/trigger value management
+    setStateValue,
+    setTriggerValue,
   } satisfies StBidiComponentV2Args)
 
   return {
@@ -252,7 +251,6 @@ const useHandleJsContent = ({
     id,
     jsContent,
     jsSourcePath,
-    registeredHandlerNames,
     widgetMgr,
   } = useRequiredContext(BidiComponentContext)
 
@@ -303,7 +301,6 @@ const useHandleJsContent = ({
             data: parsedData,
             componentIdForWidgetMgr: id,
             fragmentId,
-            registeredHandlerNames,
             widgetMgr,
           })
 
@@ -337,7 +334,6 @@ const useHandleJsContent = ({
               data: parsedData,
               componentIdForWidgetMgr: id,
               fragmentId,
-              registeredHandlerNames,
               widgetMgr,
             })
 
@@ -383,7 +379,6 @@ const useHandleJsContent = ({
     id,
     jsContent,
     jsSourcePathUrl,
-    registeredHandlerNames,
     setError,
     skip,
     widgetMgr,
@@ -485,11 +480,7 @@ const BidiComponent: FC<BidiComponentProps> = ({
     isolateStyles,
     jsContent,
     jsSourcePath,
-    registeredHandlerNames,
   } = element
-
-  // Stabilize registeredHandlerNames array to prevent unnecessary re-renders
-  const stableRegisteredHandlerNames = useStableArray(registeredHandlerNames)
 
   const contextValue = useMemo<BidiComponentContextShape>(() => {
     return {
@@ -502,7 +493,6 @@ const BidiComponent: FC<BidiComponentProps> = ({
       id,
       jsContent: jsContent || undefined,
       jsSourcePath: jsSourcePath || undefined,
-      registeredHandlerNames: stableRegisteredHandlerNames,
       widgetMgr,
     }
   }, [
@@ -515,7 +505,6 @@ const BidiComponent: FC<BidiComponentProps> = ({
     id,
     jsContent,
     jsSourcePath,
-    stableRegisteredHandlerNames,
     widgetMgr,
   ])
 

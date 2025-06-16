@@ -26,11 +26,13 @@ export type StBidiComponentV2Args<
   DataShape = unknown,
   Value = unknown,
 > = OnHandlers<Value> & {
-  childContainerIDs: string[]
   data: DataShape
   name: string
   parentElement: HTMLElement | ShadowRoot
   stKey: string
+  // New functions for state/trigger value management
+  setStateValue<T>(eventType: string, value: T): void
+  setTriggerValue<T>(eventType: string, value: T): void
 }
 
 export type ComponentResult = {

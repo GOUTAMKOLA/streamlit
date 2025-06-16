@@ -28,9 +28,9 @@ export type BidiComponentContextShape = {
   id: string
   jsContent: string | undefined
   jsSourcePath: string | undefined
-  registeredHandlerNames: readonly string[]
   widgetMgr: WidgetStateManager
 }
 
 export const BidiComponentContext =
   createContext<BidiComponentContextShape | null>(null)
+BidiComponentContext.displayName = "BidiComponentContext"

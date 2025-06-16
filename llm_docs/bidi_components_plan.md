@@ -387,46 +387,65 @@ def parse_callbacks(**kwargs) -> Dict[str, WidgetCallback]:
 
 - ⚠️ **Return Type Evolution**: Successfully changed return type from `BidiComponentState` to `BidiComponentResult`, which is a breaking change but necessary for the new API design. Existing tests will need updates to handle the new return type.
 
-**Technical Dependencies Leveraged:**
-
-- Existing SessionState trigger reset lifecycle in `_reset_triggers()`
-- AttributeDictionary for consistent access patterns
-- Existing widget registration infrastructure as foundation
-- Fragment-aware callback execution from existing implementation
-
-**Breaking Changes:**
-
-- Callback API now requires `on_{event_name}_change` pattern instead of `on_{event_name}`
-- Return type changed from `BidiComponentState` to `BidiComponentResult`
-- Callback functions now receive event value as single argument instead of using args/kwargs
-
-This implementation successfully provides a robust foundation for the dual-mode state management system while maintaining compatibility with existing Streamlit infrastructure.
-
 ### Phase 3: Frontend Integration
 
 #### TypeScript Interface Updates
 
-- [ ] Update `StBidiComponentV2Args` interface in `frontend/lib/src/components/widgets/BidiComponent/types.ts`:
+- [x] Update `StBidiComponentV2Args` interface in `frontend/lib/src/components/widgets/BidiComponent/types.ts`:
   - Remove `childContainerIDs`
   - Add `setStateValue<T>` and `setTriggerValue<T>` functions
 
 #### Component Implementation
 
-- [ ] Update `loadAndRunModule` function in `frontend/lib/src/components/widgets/BidiComponent/BidiComponent.tsx`
-- [ ] Implement `setStateValue` and `setTriggerValue` functions with type safety
-- [ ] Update handler generation logic to use new callback system
-- [ ] Remove hardcoded handler logic (like special `onClick` handling in lines 106-115)
+- [x] Update `loadAndRunModule` function in `frontend/lib/src/components/widgets/BidiComponent/BidiComponent.tsx`
+- [x] Implement `setStateValue` and `setTriggerValue` functions with type safety
+- [x] Update handler generation logic to use new callback system
+- [x] Remove hardcoded handler logic (like special `onClick` handling in lines 106-115)
 
 #### Context Updates
 
-- [ ] Update `BidiComponentContext` shape if needed for new callback system in `frontend/lib/src/components/widgets/BidiComponent/BidiComponentContext.tsx`
-- [ ] Ensure proper widget state manager integration
+- [x] Update `BidiComponentContext` shape if needed for new callback system in `frontend/lib/src/components/widgets/BidiComponent/BidiComponentContext.tsx`
+- [x] Ensure proper widget state manager integration
 
 #### Widget State Manager Integration
 
-- [ ] Support differentiation between state values and trigger values in `frontend/lib/src/WidgetStateManager.ts`
-- [ ] Implement trigger value reset logic on reruns
-- [ ] Handle multiple callback types per component
+- [x] Support differentiation between state values and trigger values in `frontend/lib/src/WidgetStateManager.ts`
+- [x] Implement trigger value reset logic on reruns
+- [x] Handle multiple callback types per component
+
+**Phase 3 Implementation Notes - Completed:**
+
+- ✅ **TypeScript Interface Updates**: Successfully updated `StBidiComponentV2Args` interface to remove `childContainerIDs` and add `setStateValue<T>` and `setTriggerValue<T>` functions with proper generic typing. The interface now provides the new API functions directly to component authors.
+
+- ✅ **WidgetStateManager Integration**: Added `setBidiComponentStateValue()` and `setBidiComponentTriggerValue()` methods to the WidgetStateManager. These methods format data according to the backend's expected schema:
+
+  - State values: `{ state_updates: { eventType: value } }`
+  - Trigger values: `{ trigger_updates: { eventType: value } }`
+
+- ✅ **Component Implementation**: Completely rewrote the `loadAndRunModule` function in `BidiComponent.tsx`:
+
+  - Added `setStateValue<T = unknown,>()` and `setTriggerValue<T = unknown,>()` functions with type safety
+  - Removed hardcoded `onClick` special handling that used `setTriggerValue` directly
+  - Maintained backward compatibility by keeping legacy handler generation (`onXxx` pattern)
+  - Updated component interface to pass new API functions to component modules
+
+- ✅ **Context Integration**: Verified that `BidiComponentContext` already provides necessary information (`registeredHandlerNames`, `widgetMgr`, etc.) and requires no changes for the new callback system.
+
+**Key Implementation Features:**
+
+1. **Backward Compatibility**: Legacy `onXxx` handlers continue to work using `setJsonValue()` for existing components.
+
+2. **Type Safety**: Generic functions `setStateValue<T>()` and `setTriggerValue<T>()` preserve type information at compile time.
+
+3. **Protocol Compliance**: Frontend sends data in the exact format expected by the backend's new `BidiComponentSerde` implementation.
+
+4. **Error Handling**: Added comprehensive logging for debugging state/trigger value operations.
+
+**Implementation Issues Identified:**
+
+- ⚠️ **TypeScript Generic Syntax**: Had to use `<T = unknown,>` syntax instead of `<T>` to avoid JSX parsing conflicts in `.tsx` files.
+
+- ⚠️ **API Transition**: Components must be updated to use the new `setStateValue()` and `setTriggerValue()` API instead of legacy `onXxx` handlers to benefit from state/trigger differentiation.
 
 ### Phase 4: Testing & Documentation
 

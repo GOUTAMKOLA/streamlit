@@ -505,6 +505,46 @@ export class WidgetStateManager {
     this.onWidgetValueChanged(widget.formId, source, fragmentId)
   }
 
+  /**
+   * Set a bidi component state value (persistent across reruns).
+   * Sends data to backend in format: { state_updates: { eventType: value } }
+   */
+  public setBidiComponentStateValue(
+    widget: WidgetInfo,
+    eventType: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TODO: Replace 'any' with a more specific type.
+    value: any,
+    source: Source,
+    fragmentId: string | undefined
+  ): void {
+    const updateData = {
+      state_updates: { [eventType]: value },
+    }
+    this.createWidgetState(widget, source).jsonValue =
+      JSON.stringify(updateData)
+    this.onWidgetValueChanged(widget.formId, source, fragmentId)
+  }
+
+  /**
+   * Set a bidi component trigger value (reset to None on rerun).
+   * Sends data to backend in format: { trigger_updates: { eventType: value } }
+   */
+  public setBidiComponentTriggerValue(
+    widget: WidgetInfo,
+    eventType: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TODO: Replace 'any' with a more specific type.
+    value: any,
+    source: Source,
+    fragmentId: string | undefined
+  ): void {
+    const updateData = {
+      trigger_updates: { [eventType]: value },
+    }
+    this.createWidgetState(widget, source).jsonValue =
+      JSON.stringify(updateData)
+    this.onWidgetValueChanged(widget.formId, source, fragmentId)
+  }
+
   public setArrowValue(
     widget: WidgetInfo,
     value: IArrowTable,
