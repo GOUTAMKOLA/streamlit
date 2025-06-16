@@ -295,25 +295,112 @@ def parse_callbacks(**kwargs) -> Dict[str, WidgetCallback]:
 
 - [x] Update `proto/streamlit/proto/BidiComponent.proto` for state vs trigger values (if needed)
 
+**Phase 1 Implementation Notes**
+
+**Completed:**
+
+- ✅ `BidiComponentResult` class: Successfully implemented with AttributeDictionary inheritance, supporting both `.property` and `["dictionary"]` access patterns. The class stores the DeltaGenerator as a special property while merging state values.
+- ✅ `BidiComponentWidgetState` dataclass: Implemented with separate `state_values` and `trigger_values` dictionaries to support the dual-mode state management system.
+- ✅ Trigger reset mechanism: Extended `SessionState._reset_triggers()` to include `_reset_bidi_component_triggers()` method that safely resets trigger values to None while leveraging existing Streamlit lifecycle.
+
+**Implementation Considerations:**
+
+- Used defensive programming in `_reset_bidi_component_triggers()` to handle cases where widget state doesn't have expected structure
+- Added circular import protection by importing `BidiComponentWidgetState` locally within the reset method
+- The trigger reset integration leverages existing Streamlit infrastructure rather than creating new systems
+
+**Function Signature Updates - Completed:**
+
+- ✅ Updated `component()` function in `lib/streamlit/components/v2/__init__.py` to use `**on_callbacks: WidgetCallback` pattern instead of `on_change` and `**kwargs`
+- ✅ Implemented callback parsing logic using `on_{state_name}_change` pattern (e.g., `on_click_change`, `on_value_change`)
+- ✅ Removed `*args` and replaced old callback handling in `BidiComponentMixin.bidi_component()`
+- ✅ Added comprehensive docstring with parameter descriptions
+- ✅ Added helper function `parse_callbacks()` for reusable callback parsing logic
+
+**Protobuf Changes - Completed:**
+
+- ✅ Added documentation comment to `BidiComponent.proto` indicating future extension for state vs trigger differentiation
+- ✅ Current schema supports the Phase 1 implementation; more extensive changes will be needed in Phase 2 for state/trigger value differentiation
+
+**Breaking Changes:**
+
+- The callback API now requires `on_{event_name}_change` pattern instead of `on_{event_name}`
+- Updated tests to reflect new callback pattern (e.g., `on_value_change` instead of `on_change`)
+
+**Backwards Compatibility:**
+
+- Function signature changes are breaking but necessary for the new API design
+- All existing tests pass with minimal updates to use new callback patterns
+
+**Implementation Issues Identified:**
+
+- ⚠️ **Return Type Change Pending**: The plan calls for changing return type from `BidiComponentState` to `BidiComponentResult`, but this was not implemented in Phase 1 to avoid breaking existing functionality. This change should be addressed in a later phase when the full state management system is implemented.
+- ⚠️ **Phase 2 Dependency**: The new callback parsing logic is in place, but the actual state vs trigger value differentiation requires the Phase 2 state management system implementation.
+
 ### Phase 2: State Management System
 
 #### Widget Registration
 
-- [ ] Create `register_bidi_widget()` function for dual-mode state management in `lib/streamlit/runtime/state/widgets.py`
-- [ ] Update `BidiComponentMixin.bidi_component()` in `lib/streamlit/components/v2/bidi_component.py` to handle new callback system
-- [ ] Modify return type from `BidiComponentState` to `BidiComponentResult` in `lib/streamlit/components/v2/bidi_component.py`
+- [x] Create `register_bidi_widget()` function for dual-mode state management in `lib/streamlit/runtime/state/widgets.py`
+- [x] Update `BidiComponentMixin.bidi_component()` in `lib/streamlit/components/v2/bidi_component.py` to handle new callback system
+- [x] Modify return type from `BidiComponentState` to `BidiComponentResult` in `lib/streamlit/components/v2/bidi_component.py`
 
 #### Serialization/Deserialization
 
-- [ ] Implement new `BidiComponentSerde` with state/trigger differentiation in `lib/streamlit/components/v2/bidi_component.py`
-- [ ] Extend `SessionState._reset_triggers()` method in `lib/streamlit/runtime/state/session_state.py` to handle bidi component triggers
-- [ ] Update widget state management to handle multiple callbacks in `lib/streamlit/runtime/state/session_state.py`
+- [x] Implement new `BidiComponentSerde` with state/trigger differentiation in `lib/streamlit/components/v2/bidi_component.py`
+- [x] Extend `SessionState._reset_triggers()` method in `lib/streamlit/runtime/state/session_state.py` to handle bidi component triggers
+- [x] Update widget state management to handle multiple callbacks in `lib/streamlit/runtime/state/session_state.py`
 
 #### Memory Management
 
-- [ ] Implement trigger value cleanup mechanism in `SessionState.on_script_will_rerun()` in `lib/streamlit/runtime/state/session_state.py`
-- [ ] Add trigger reset integration in `ScriptRunner._run_script()` in `lib/streamlit/runtime/scriptrunner/script_runner.py`
-- [ ] Handle memory cleanup for long-running sessions leveraging existing cleanup in `SessionState.on_script_finished()`
+- [x] Implement trigger value cleanup mechanism in `SessionState.on_script_will_rerun()` in `lib/streamlit/runtime/state/session_state.py`
+- [x] Add trigger reset integration in `ScriptRunner._run_script()` in `lib/streamlit/runtime/scriptrunner/script_runner.py`
+- [x] Handle memory cleanup for long-running sessions leveraging existing cleanup in `SessionState.on_script_finished()`
+
+**Phase 2 Implementation Notes - Completed:**
+
+- ✅ **Widget Registration System**: Successfully implemented specialized `register_bidi_widget()` function and `register_bidi_widget_from_metadata()` in `lib/streamlit/runtime/state/widgets.py`. These functions handle dual-mode state management with BidiComponentWidgetState objects containing both persistent state values and transient trigger values.
+
+- ✅ **BidiComponentMixin Updates**: Updated `bidi_component()` method to use new registration system, changed return type from `BidiComponentState` to `BidiComponentResult`, and implemented proper callback parsing with `on_{state_name}_change` pattern. The method now returns a BidiComponentResult object containing both DeltaGenerator and merged state values.
+
+- ✅ **Enhanced BidiComponentSerde**: Completely rewrote the serialization/deserialization logic to handle state/trigger differentiation. The new implementation supports frontend communication format with `state_updates` (persistent) and `trigger_updates` (transient) fields, while maintaining backward compatibility with legacy format.
+
+- ✅ **SessionState Integration**: Added `register_bidi_widget()` method to SessionState class that properly initializes and manages BidiComponentWidgetState objects. The method handles merging of state and trigger values for return to components while maintaining separation for internal state management.
+
+- ✅ **Advanced Callback System**: Completely rewrote `_call_callbacks()` method to handle bidi components with event-specific callbacks. Each callback receives the specific event value as a single argument. Trigger values are called immediately when set, state values are called only when changed compared to previous run. Legacy widget callback handling remains intact for non-bidi components.
+
+- ✅ **Memory Management**: All trigger reset mechanisms leverage existing Streamlit infrastructure. The `_reset_bidi_component_triggers()` method integrates seamlessly with the existing `_reset_triggers()` lifecycle, which is automatically called via `on_script_will_rerun()` in ScriptRunner. No additional ScriptRunner modifications were needed.
+
+**Key Implementation Features:**
+
+1. **Defensive Programming**: All bidi component detection uses safe type checking and exception handling to avoid breaking existing widget functionality.
+
+2. **Circular Import Protection**: Strategic use of local imports within methods to avoid circular dependency issues between components and session state.
+
+3. **Backward Compatibility**: Legacy callback patterns and simple value formats continue to work unchanged.
+
+4. **Type Safety**: Proper TYPE_CHECKING imports ensure type hints work correctly while avoiding runtime circular imports.
+
+**Implementation Issues Identified:**
+
+- ⚠️ **Component ID Dependency**: The new BidiComponentSerde requires component ID to be set via `set_component_id()` method for proper widget state access. This creates a slight coupling between serialization and widget registration that should be monitored.
+
+- ⚠️ **Return Type Evolution**: Successfully changed return type from `BidiComponentState` to `BidiComponentResult`, which is a breaking change but necessary for the new API design. Existing tests will need updates to handle the new return type.
+
+**Technical Dependencies Leveraged:**
+
+- Existing SessionState trigger reset lifecycle in `_reset_triggers()`
+- AttributeDictionary for consistent access patterns
+- Existing widget registration infrastructure as foundation
+- Fragment-aware callback execution from existing implementation
+
+**Breaking Changes:**
+
+- Callback API now requires `on_{event_name}_change` pattern instead of `on_{event_name}`
+- Return type changed from `BidiComponentState` to `BidiComponentResult`
+- Callback functions now receive event value as single argument instead of using args/kwargs
+
+This implementation successfully provides a robust foundation for the dual-mode state management system while maintaining compatibility with existing Streamlit infrastructure.
 
 ### Phase 3: Frontend Integration
 
@@ -378,47 +465,5 @@ def parse_callbacks(**kwargs) -> Dict[str, WidgetCallback]:
 - Leverage existing trigger reset mechanism in `lib/streamlit/runtime/state/session_state.py`
 - Build on existing widget state management system
 - Use existing `AttributeDictionary` for return type implementation
-
-### Phase 1 Implementation Notes
-
-**Completed:**
-
-- ✅ `BidiComponentResult` class: Successfully implemented with AttributeDictionary inheritance, supporting both `.property` and `["dictionary"]` access patterns. The class stores the DeltaGenerator as a special property while merging state values.
-- ✅ `BidiComponentWidgetState` dataclass: Implemented with separate `state_values` and `trigger_values` dictionaries to support the dual-mode state management system.
-- ✅ Trigger reset mechanism: Extended `SessionState._reset_triggers()` to include `_reset_bidi_component_triggers()` method that safely resets trigger values to None while leveraging existing Streamlit lifecycle.
-
-**Implementation Considerations:**
-
-- Used defensive programming in `_reset_bidi_component_triggers()` to handle cases where widget state doesn't have expected structure
-- Added circular import protection by importing `BidiComponentWidgetState` locally within the reset method
-- The trigger reset integration leverages existing Streamlit infrastructure rather than creating new systems
-
-**Function Signature Updates - Completed:**
-
-- ✅ Updated `component()` function in `lib/streamlit/components/v2/__init__.py` to use `**on_callbacks: WidgetCallback` pattern instead of `on_change` and `**kwargs`
-- ✅ Implemented callback parsing logic using `on_{state_name}_change` pattern (e.g., `on_click_change`, `on_value_change`)
-- ✅ Removed `*args` and replaced old callback handling in `BidiComponentMixin.bidi_component()`
-- ✅ Added comprehensive docstring with parameter descriptions
-- ✅ Added helper function `parse_callbacks()` for reusable callback parsing logic
-
-**Protobuf Changes - Completed:**
-
-- ✅ Added documentation comment to `BidiComponent.proto` indicating future extension for state vs trigger differentiation
-- ✅ Current schema supports the Phase 1 implementation; more extensive changes will be needed in Phase 2 for state/trigger value differentiation
-
-**Breaking Changes:**
-
-- The callback API now requires `on_{event_name}_change` pattern instead of `on_{event_name}`
-- Updated tests to reflect new callback pattern (e.g., `on_value_change` instead of `on_change`)
-
-**Backwards Compatibility:**
-
-- Function signature changes are breaking but necessary for the new API design
-- All existing tests pass with minimal updates to use new callback patterns
-
-**Implementation Issues Identified:**
-
-- ⚠️ **Return Type Change Pending**: The plan calls for changing return type from `BidiComponentState` to `BidiComponentResult`, but this was not implemented in Phase 1 to avoid breaking existing functionality. This change should be addressed in a later phase when the full state management system is implemented.
-- ⚠️ **Phase 2 Dependency**: The new callback parsing logic is in place, but the actual state vs trigger value differentiation requires the Phase 2 state management system implementation.
 
 This plan provides a comprehensive roadmap for implementing the Bidi Components v2 API changes while leveraging existing Streamlit infrastructure and maintaining code quality.

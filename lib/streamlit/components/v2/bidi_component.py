@@ -27,7 +27,7 @@ from streamlit.errors import StreamlitAPIException
 from streamlit.proto.BidiComponent_pb2 import BidiComponent as BidiComponentProto
 from streamlit.runtime.metrics_util import gather_metrics
 from streamlit.runtime.scriptrunner_utils.script_run_context import get_script_run_ctx
-from streamlit.runtime.state import register_widget
+from streamlit.runtime.state.widgets import register_bidi_widget
 from streamlit.util import AttributeDictionary
 
 if TYPE_CHECKING:
@@ -109,36 +109,105 @@ class BidiComponentResult(AttributeDictionary):
 
 @dataclass
 class BidiComponentSerde:
-    """Serialization/deserialization logic for BidiComponent.
+    """Serialization/deserialization logic for BidiComponent with state/trigger differentiation.
 
-    Assumes communication via JSON strings.
+    This new implementation supports the dual-mode state management system:
+    - State Values: Persistent across reruns until explicitly changed
+    - Trigger Values: Reset to None at the start of each script run
     """
 
     def deserialize(self, ui_value: str | dict | None) -> BidiComponentState:
-        """Deserialize the state from the frontend.
+        """Deserialize the state from the frontend with state/trigger differentiation.
+
+        The frontend sends data in the format:
+        {
+            "state_updates": {eventType: value, ...},  # Persistent values
+            "trigger_updates": {eventType: value, ...}  # Transient values
+        }
 
         Args:
-            ui_value: The JSON string received from the frontend.
+            ui_value: The JSON string or dict received from the frontend.
 
         Returns
         -------
             The deserialized state wrapped in an AttributeDictionary.
         """
+        from streamlit.runtime.scriptrunner_utils.script_run_context import (
+            get_script_run_ctx,
+        )
+
         try:
             if isinstance(ui_value, dict):
-                deserialized_value = ui_value
+                data = ui_value
             elif ui_value is not None:
                 if isinstance(ui_value, (int, float, bool)):
-                    deserialized_value = ui_value
+                    # Simple value - treat as legacy format
+                    data = {"value": ui_value}
                 else:
-                    deserialized_value = json.loads(ui_value)
+                    data = json.loads(ui_value)
             else:
-                deserialized_value = None
+                data = {}
         except Exception:
             # TODO: Should we raise an error here? Should we let the user know?
-            deserialized_value = None
+            data = {}
 
-        state: BidiComponentState = {"value": deserialized_value}
+        # Get current script context to access widget state
+        ctx = get_script_run_ctx()
+        if ctx is None:
+            # No context available - return simple value format
+            state: BidiComponentState = {"value": data}
+            return cast("BidiComponentState", AttributeDictionary(state))
+
+        # For the new format, we need to get the component ID to access widget state
+        # This is a bit of a hack - we'll store the component ID in the serde instance
+        component_id = getattr(self, "_component_id", None)
+        if component_id is None:
+            # Fallback to legacy behavior
+            state: BidiComponentState = {"value": data}
+            return cast("BidiComponentState", AttributeDictionary(state))
+
+        # Try to get the existing BidiComponentWidgetState
+        try:
+            widget_state = ctx.session_state._new_widget_state[component_id]
+            if not isinstance(widget_state, BidiComponentWidgetState):
+                # Initialize as BidiComponentWidgetState if not already
+                widget_state = BidiComponentWidgetState()
+                ctx.session_state._new_widget_state.set_from_value(
+                    component_id, widget_state
+                )
+        except (KeyError, AttributeError):
+            # Create new widget state
+            widget_state = BidiComponentWidgetState()
+            try:
+                ctx.session_state._new_widget_state.set_from_value(
+                    component_id, widget_state
+                )
+            except Exception:  # noqa: S110
+                # Fallback if we can't set widget state
+                pass
+
+        # Update state values (persistent)
+        if "state_updates" in data:
+            widget_state.state_values.update(data["state_updates"])
+
+        # Update trigger values (for current run only)
+        if "trigger_updates" in data:
+            widget_state.trigger_values.update(data["trigger_updates"])
+
+        # Handle legacy format where data is a simple value
+        if (
+            "state_updates" not in data
+            and "trigger_updates" not in data
+            and "value" in data
+        ):
+            # Legacy format - treat as state value
+            widget_state.state_values["value"] = data["value"]
+
+        # Merge state and trigger values for return
+        result_values = widget_state.state_values.copy()
+        result_values.update(widget_state.trigger_values)
+
+        state: BidiComponentState = {"value": result_values}
         return cast("BidiComponentState", AttributeDictionary(state))
 
     def serialize(self, value: Any) -> str:
@@ -155,6 +224,13 @@ class BidiComponentSerde:
         # Defaulting to JSON serialization.
         return json.dumps(value)
 
+    def set_component_id(self, component_id: str) -> None:
+        """Set the component ID for this serde instance.
+
+        This is used to access the correct widget state during deserialization.
+        """
+        self._component_id = component_id
+
 
 class BidiComponentMixin:
     """Mixin class for the bidi_component DeltaGenerator method."""
@@ -169,7 +245,7 @@ class BidiComponentMixin:
         # TODO: This needs to have a better type + support Arrow
         data: Any | None = None,
         **on_callbacks: WidgetCallback,
-    ) -> BidiComponentState:
+    ) -> BidiComponentResult:
         """Add a bidirectional component instance to the app using a registered component.
 
         Parameters
@@ -194,9 +270,9 @@ class BidiComponentMixin:
 
         Returns
         -------
-        BidiComponentState
-            A dictionary-like object representing the component's state,
-            supporting attribute and key-based access for the 'value' field.
+        BidiComponentResult
+            A result object containing both a DeltaGenerator and the component's state,
+            supporting both .property and ["dictionary"] access patterns for the state values.
 
         Raises
         ------
@@ -212,8 +288,9 @@ class BidiComponentMixin:
 
         if ctx is None:
             # Create an empty state with the default value and return it
-            state: BidiComponentState = {"value": default}
-            return cast("BidiComponentState", AttributeDictionary(state))
+            state_values = {"value": default}
+            # Create a mock DeltaGenerator for non-context scenarios
+            return BidiComponentResult(self.dg, state_values)
 
         # Get the component definition from the registry
         from streamlit.runtime import Runtime
@@ -274,22 +351,40 @@ class BidiComponentMixin:
         if handlers:
             bidi_component_proto.registered_handler_names.extend(handlers.keys())
 
-        # Instantiate the Serde for this component instance
+        # Instantiate the Serde for this component instance and set component ID
         serde = BidiComponentSerde()
+        serde.set_component_id(computed_id)
 
-        component_state = register_widget(
+        # Initialize widget state for first registration
+        initial_widget_state = BidiComponentWidgetState()
+        if default is not None:
+            initial_widget_state.state_values["value"] = default
+
+        # Register the widget using the new bidi-specific registration
+        component_state = register_bidi_widget(
             bidi_component_proto.id,
             deserializer=serde.deserialize,
             serializer=serde.serialize,
             ctx=ctx,
             callbacks=handlers if handlers else None,
             value_type="json_value",
+            initial_widget_state=initial_widget_state,
         )
 
         # Enqueue using the dg instance
         self.dg._enqueue(INTERNAL_COMPONENT_NAME, bidi_component_proto)
 
-        return cast("BidiComponentState", component_state.value)
+        # Extract state values from the component state
+        state_dict = {}
+        if hasattr(component_state.value, "value") and isinstance(
+            component_state.value.value, dict
+        ):
+            state_dict = component_state.value.value
+        elif isinstance(component_state.value, dict):
+            state_dict = component_state.value
+
+        # Return BidiComponentResult with delta generator and state values
+        return BidiComponentResult(self.dg, state_dict)
 
     @property
     def dg(self) -> DeltaGenerator:
