@@ -163,14 +163,12 @@ class BidiComponentMixin:
     def bidi_component(
         self,
         component_name: str,
-        *args: Any,
         key: str | None = None,
         default: Any = None,
-        on_change: WidgetCallback | None = None,
         child_container_count: int = 0,
         # TODO: This needs to have a better type + support Arrow
         data: Any | None = None,
-        **kwargs: Any,
+        **on_callbacks: WidgetCallback,
     ) -> BidiComponentState:
         """Add a bidirectional component instance to the app using a registered component.
 
@@ -179,8 +177,6 @@ class BidiComponentMixin:
         component_name : str
             The name of the registered component to use. The component's HTML, CSS,
             and JS will be loaded from the registry.
-        *args
-            Positional arguments to pass to the component.
         key : str or None
             An optional string to use as the unique key for the component.
             If this is omitted, a key will be generated based on the
@@ -188,12 +184,13 @@ class BidiComponentMixin:
         default: any or None
             The default return value for the component. This is returned when
             the component's frontend hasn't yet specified a value.
-        on_change: WidgetCallback or None
-            An optional callback invoked when the component's value changes.
         child_container_count : int
             The number of child containers this component has. Default is 0.
-        **kwargs
-            Keyword arguments to pass to the component.
+        data : Any or None
+            Data to pass to the component (JSON-serializable).
+        **on_callbacks : WidgetCallback
+            Callback functions for handling component events. Use pattern
+            on_{state_name}_change (e.g., on_click_change, on_value_change).
 
         Returns
         -------
@@ -245,17 +242,20 @@ class BidiComponentMixin:
             form_id=current_form_id(self.dg),
         )
 
+        # Parse callbacks using the new on_{state_name}_change pattern
         handlers: dict[str, WidgetCallback] = {}
-        if callable(on_change):
-            handlers["change"] = on_change
-
-        # Example for other handlers like on_click from kwargs
-        # We can make this more robust or configurable if needed.
-        for kwarg_key, kwarg_value in kwargs.items():
-            if kwarg_key.startswith("on_") and callable(kwarg_value):
-                event_name = kwarg_key[3:]  # remove "on_"
-                if event_name:  # Ensure we have an event name
-                    handlers[event_name] = kwarg_value
+        for callback_key, callback_value in on_callbacks.items():
+            if (
+                callback_key.startswith("on_")
+                and callback_key.endswith("_change")
+                and callable(callback_value)
+            ):
+                # Extract event name: on_foo_change -> foo
+                event_name = callback_key[
+                    3:-7
+                ]  # Remove "on_" prefix and "_change" suffix
+                if event_name:  # Ensure we have a valid event name
+                    handlers[event_name] = callback_value
 
         # Set up the component proto
         bidi_component_proto = BidiComponentProto()

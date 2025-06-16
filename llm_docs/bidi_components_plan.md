@@ -287,13 +287,13 @@ def parse_callbacks(**kwargs) -> Dict[str, WidgetCallback]:
 
 #### Function Signature Updates
 
-- [ ] Update `component()` function signature in `lib/streamlit/components/v2/__init__.py`
-- [ ] Implement callback parsing logic for `on_{state_name}_change` pattern in `BidiComponentMixin.bidi_component()`
-- [ ] Remove `args`/`kwargs` from public API in `lib/streamlit/components/v2/bidi_component.py`
+- [x] Update `component()` function signature in `lib/streamlit/components/v2/__init__.py`
+- [x] Implement callback parsing logic for `on_{state_name}_change` pattern in `BidiComponentMixin.bidi_component()`
+- [x] Remove `args`/`kwargs` from public API in `lib/streamlit/components/v2/bidi_component.py`
 
 #### Protobuf Changes
 
-- [ ] Update `proto/streamlit/proto/BidiComponent.proto` for state vs trigger values (if needed)
+- [x] Update `proto/streamlit/proto/BidiComponent.proto` for state vs trigger values (if needed)
 
 ### Phase 2: State Management System
 
@@ -393,17 +393,32 @@ def parse_callbacks(**kwargs) -> Dict[str, WidgetCallback]:
 - Added circular import protection by importing `BidiComponentWidgetState` locally within the reset method
 - The trigger reset integration leverages existing Streamlit infrastructure rather than creating new systems
 
-**Next Steps:**
+**Function Signature Updates - Completed:**
 
-- Phase 2 will need to integrate these data structures with the actual widget registration and serialization logic
-- The `BidiComponentWidgetState` class will need to be properly instantiated and managed during component lifecycle
-- Frontend integration will require corresponding TypeScript interface updates
+- ✅ Updated `component()` function in `lib/streamlit/components/v2/__init__.py` to use `**on_callbacks: WidgetCallback` pattern instead of `on_change` and `**kwargs`
+- ✅ Implemented callback parsing logic using `on_{state_name}_change` pattern (e.g., `on_click_change`, `on_value_change`)
+- ✅ Removed `*args` and replaced old callback handling in `BidiComponentMixin.bidi_component()`
+- ✅ Added comprehensive docstring with parameter descriptions
+- ✅ Added helper function `parse_callbacks()` for reusable callback parsing logic
 
-**Validation:**
+**Protobuf Changes - Completed:**
 
-- ✅ All syntax checks pass for both modified files
-- ✅ All existing bidi component tests continue to pass (13/13 tests passing)
-- ✅ No breaking changes introduced to existing functionality
-- ✅ Code follows defensive programming principles and proper error handling
+- ✅ Added documentation comment to `BidiComponent.proto` indicating future extension for state vs trigger differentiation
+- ✅ Current schema supports the Phase 1 implementation; more extensive changes will be needed in Phase 2 for state/trigger value differentiation
+
+**Breaking Changes:**
+
+- The callback API now requires `on_{event_name}_change` pattern instead of `on_{event_name}`
+- Updated tests to reflect new callback pattern (e.g., `on_value_change` instead of `on_change`)
+
+**Backwards Compatibility:**
+
+- Function signature changes are breaking but necessary for the new API design
+- All existing tests pass with minimal updates to use new callback patterns
+
+**Implementation Issues Identified:**
+
+- ⚠️ **Return Type Change Pending**: The plan calls for changing return type from `BidiComponentState` to `BidiComponentResult`, but this was not implemented in Phase 1 to avoid breaking existing functionality. This change should be addressed in a later phase when the full state management system is implemented.
+- ⚠️ **Phase 2 Dependency**: The new callback parsing logic is in place, but the actual state vs trigger value differentiation requires the Phase 2 state management system implementation.
 
 This plan provides a comprehensive roadmap for implementing the Bidi Components v2 API changes while leveraging existing Streamlit infrastructure and maintaining code quality.

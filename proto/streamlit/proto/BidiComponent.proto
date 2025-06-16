@@ -52,6 +52,8 @@ message BidiComponent {
     // Whether to isolate styles from the parent.
     bool isolate_styles = 9;
     // The JSON value of the component's state.
+    // NOTE: This will be extended in future phases to support differentiation
+    // between state values (persistent) and trigger values (reset on rerun).
     string data = 10;
     // TODO: Support dataframes via Arrow
     // Additional, non-JSON args. These require special processing
