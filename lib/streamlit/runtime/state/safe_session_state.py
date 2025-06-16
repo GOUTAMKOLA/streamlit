@@ -58,6 +58,18 @@ class SafeSessionState:
         with self._lock:
             return self._state.register_widget(metadata, user_key)
 
+    def register_bidi_widget(
+        self,
+        metadata: WidgetMetadata[T],
+        user_key: str | None,
+        initial_widget_state: Any = None,
+    ) -> RegisterWidgetResult[T]:
+        self._yield_callback()
+        with self._lock:
+            return self._state.register_bidi_widget(
+                metadata, user_key, initial_widget_state
+            )
+
     def on_script_will_rerun(self, latest_widget_states: WidgetStatesProto) -> None:
         self._yield_callback()
         with self._lock:

@@ -108,7 +108,7 @@ with st.echo():
 export default function(component) {
   console.log("I am a bidi component", component)
 
-  const { parentElement, onChange, onClick } = component
+  const { parentElement, setStateValue, setTriggerValue } = component
 
   const form = parentElement.querySelector("form")
   const handleSubmit = (event) => {
@@ -118,17 +118,21 @@ export default function(component) {
       text: event.target.text.value,
     }
     console.log("Form submitted with values", formValues)
-    onChange(formValues)
+    setStateValue("form", formValues)
   }
 
   form.addEventListener("submit", handleSubmit)
 
-  parentElement.addEventListener("click", onClick, { capture: true })
+  const handleClick = () => {
+    setTriggerValue("clicked", true)
+  }
+
+  parentElement.addEventListener("click", handleClick, { capture: true })
 
   return () => {
     console.log("Cleaning up")
     form.removeEventListener("submit", handleSubmit)
-    parentElement.removeEventListener("click", onClick, { capture: true })
+    parentElement.removeEventListener("click", handleClick, { capture: true })
   }
 }
 """
