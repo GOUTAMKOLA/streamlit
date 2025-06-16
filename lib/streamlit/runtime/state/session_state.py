@@ -692,6 +692,40 @@ class SessionState:
                 }:
                     self._old_state[state_id] = None
 
+        # Reset bidi component trigger values
+        self._reset_bidi_component_triggers()
+
+    def _reset_bidi_component_triggers(self) -> None:
+        """Reset all trigger values in bidi component widget states to None.
+
+        This method leverages Streamlit's existing widget lifecycle to handle
+        the new trigger reset functionality for bidi components without
+        requiring complex cross-run tracking.
+        """
+        # Import here to avoid circular imports
+
+        # Check all widget states for bidi components
+        for widget_id in self._new_widget_state.states:
+            try:
+                widget_value = self._new_widget_state[widget_id]
+
+                # Check if this widget state contains bidi component state structure
+                # We identify bidi components by checking if the value has the expected structure
+                if (
+                    isinstance(widget_value, dict)
+                    and hasattr(widget_value, "__class__")
+                    and widget_value.__class__.__name__ == "BidiComponentWidgetState"
+                ):
+                    # Reset all trigger values to None for this bidi component
+                    if hasattr(widget_value, "trigger_values"):
+                        for trigger_key in widget_value.trigger_values:
+                            widget_value.trigger_values[trigger_key] = None
+
+            except (KeyError, AttributeError):
+                # Handle cases where widget state doesn't exist or doesn't have expected structure
+                # This is expected for non-bidi components
+                continue
+
     def _remove_stale_widgets(self, active_widget_ids: set[str]) -> None:
         """Remove widget state for widgets whose ids aren't in `active_widget_ids`."""
         ctx = get_script_run_ctx()

@@ -58,6 +58,56 @@ class BidiComponentState(TypedDict, total=False):
 
 
 @dataclass
+class BidiComponentWidgetState:
+    """Widget state for bidi components supporting dual-mode state management.
+
+    This class supports the new state persistence vs trigger system design:
+    - State Values: Persist across reruns until explicitly changed (like current widgets)
+    - Trigger Values: Available for one rerun cycle, then automatically reset to None
+
+    Attributes
+    ----------
+    state_values : dict[str, Any]
+        Values that persist across script runs until explicitly changed
+    trigger_values : dict[str, Any]
+        Values that are reset to None at the start of each script run
+    """
+
+    state_values: dict[str, Any]
+    trigger_values: dict[str, Any]
+
+    def __init__(self):
+        self.state_values = {}
+        self.trigger_values = {}
+
+
+class BidiComponentResult(AttributeDictionary):
+    """
+    Result object from st.components.v2.component containing both
+    a DeltaGenerator and component state values.
+
+    This class supports both .property and ["dictionary"] access patterns
+    and handles state values (persistent) vs trigger values (reset to None on rerun).
+
+    Attributes
+    ----------
+    delta_generator : DeltaGenerator
+        The DeltaGenerator instance for this component
+    **state_values : Any
+        The merged state and trigger values as attributes/dictionary keys
+    """
+
+    def __init__(self, delta_generator: DeltaGenerator, state_values: dict[str, Any]):
+        # Store delta_generator as a special property and merge with state values
+        super().__init__({"delta_generator": delta_generator, **state_values})
+
+    @property
+    def delta_generator(self) -> DeltaGenerator:
+        """Get the DeltaGenerator for this component."""
+        return self["delta_generator"]
+
+
+@dataclass
 class BidiComponentSerde:
     """Serialization/deserialization logic for BidiComponent.
 

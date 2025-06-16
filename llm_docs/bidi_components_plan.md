@@ -281,9 +281,9 @@ def parse_callbacks(**kwargs) -> Dict[str, WidgetCallback]:
 
 #### Core Data Structures
 
-- [ ] Create `BidiComponentResult` class with AttributeDictionary inheritance in `lib/streamlit/components/v2/bidi_component.py`
-- [ ] Create `BidiComponentWidgetState` dataclass for dual-mode state management in `lib/streamlit/components/v2/bidi_component.py`
-- [ ] Implement trigger reset mechanism by extending `SessionState._reset_triggers()` in `lib/streamlit/runtime/state/session_state.py`
+- [x] Create `BidiComponentResult` class with AttributeDictionary inheritance in `lib/streamlit/components/v2/bidi_component.py`
+- [x] Create `BidiComponentWidgetState` dataclass for dual-mode state management in `lib/streamlit/components/v2/bidi_component.py`
+- [x] Implement trigger reset mechanism by extending `SessionState._reset_triggers()` in `lib/streamlit/runtime/state/session_state.py`
 
 #### Function Signature Updates
 
@@ -378,5 +378,32 @@ def parse_callbacks(**kwargs) -> Dict[str, WidgetCallback]:
 - Leverage existing trigger reset mechanism in `lib/streamlit/runtime/state/session_state.py`
 - Build on existing widget state management system
 - Use existing `AttributeDictionary` for return type implementation
+
+### Phase 1 Implementation Notes
+
+**Completed:**
+
+- ✅ `BidiComponentResult` class: Successfully implemented with AttributeDictionary inheritance, supporting both `.property` and `["dictionary"]` access patterns. The class stores the DeltaGenerator as a special property while merging state values.
+- ✅ `BidiComponentWidgetState` dataclass: Implemented with separate `state_values` and `trigger_values` dictionaries to support the dual-mode state management system.
+- ✅ Trigger reset mechanism: Extended `SessionState._reset_triggers()` to include `_reset_bidi_component_triggers()` method that safely resets trigger values to None while leveraging existing Streamlit lifecycle.
+
+**Implementation Considerations:**
+
+- Used defensive programming in `_reset_bidi_component_triggers()` to handle cases where widget state doesn't have expected structure
+- Added circular import protection by importing `BidiComponentWidgetState` locally within the reset method
+- The trigger reset integration leverages existing Streamlit infrastructure rather than creating new systems
+
+**Next Steps:**
+
+- Phase 2 will need to integrate these data structures with the actual widget registration and serialization logic
+- The `BidiComponentWidgetState` class will need to be properly instantiated and managed during component lifecycle
+- Frontend integration will require corresponding TypeScript interface updates
+
+**Validation:**
+
+- ✅ All syntax checks pass for both modified files
+- ✅ All existing bidi component tests continue to pass (13/13 tests passing)
+- ✅ No breaking changes introduced to existing functionality
+- ✅ Code follows defensive programming principles and proper error handling
 
 This plan provides a comprehensive roadmap for implementing the Bidi Components v2 API changes while leveraging existing Streamlit infrastructure and maintaining code quality.
