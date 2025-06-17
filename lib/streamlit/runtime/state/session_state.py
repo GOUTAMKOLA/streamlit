@@ -750,27 +750,58 @@ class SessionState:
         requiring complex cross-run tracking.
         """
         # Import here to avoid circular imports
+        from streamlit.components.v2.bidi_component import BidiComponentWidgetState
 
         # Check all widget states for bidi components
         for widget_id in self._new_widget_state.states:
             try:
-                widget_value = self._new_widget_state[widget_id]
+                # Access the raw widget state without deserialization
+                # self._new_widget_state[widget_id] goes through __getitem__ which deserializes
+                # Instead, we access the raw state directly from the states dict
+                raw_state = self._new_widget_state.states.get(widget_id)
 
-                # Check if this widget state contains bidi component state structure
-                # We identify bidi components by checking if the value has the expected structure
-                if (
-                    isinstance(widget_value, dict)
-                    and hasattr(widget_value, "__class__")
-                    and widget_value.__class__.__name__ == "BidiComponentWidgetState"
-                    # Reset all trigger values to None for this bidi component
-                    and hasattr(widget_value, "trigger_values")
-                ):
-                    for trigger_key in widget_value.trigger_values:
-                        widget_value.trigger_values[trigger_key] = None
+                if not raw_state:
+                    continue
 
-            except (KeyError, AttributeError):  # noqa: PERF203
+                # Check if this is a Value object (deserialized widget state)
+                if isinstance(raw_state, Value):
+                    widget_value = raw_state.value
+
+                    # Check if this is a BidiComponentWidgetState directly
+                    if isinstance(widget_value, BidiComponentWidgetState):
+                        # Reset all trigger values to None for this bidi component
+                        if (
+                            hasattr(widget_value, "trigger_values")
+                            and widget_value.trigger_values
+                        ):
+                            for trigger_key in list(widget_value.trigger_values.keys()):
+                                widget_value.trigger_values[trigger_key] = None
+
+                elif isinstance(raw_state, Serialized):
+                    # For serialized states, we can't easily access the BidiComponentWidgetState
+                    # without going through deserialization. We'll skip these for now and let
+                    # the deserialization process handle trigger reset when the state is accessed.
+                    continue
+
+            except (KeyError, AttributeError, TypeError):
                 # Handle cases where widget state doesn't exist or doesn't have expected structure
                 # This is expected for non-bidi components
+                continue
+
+        # Also check _old_state for any bidi components that might be there
+        for widget_id, widget_value in self._old_state.items():
+            try:
+                if isinstance(widget_value, BidiComponentWidgetState):
+                    # Reset all trigger values to None for this bidi component
+                    if (
+                        hasattr(widget_value, "trigger_values")
+                        and widget_value.trigger_values
+                    ):
+                        for trigger_key in list(widget_value.trigger_values.keys()):
+                            widget_value.trigger_values[trigger_key] = None
+
+            except (AttributeError, TypeError):
+                # Handle cases where widget state doesn't have expected structure
                 continue
 
     def _remove_stale_widgets(self, active_widget_ids: set[str]) -> None:

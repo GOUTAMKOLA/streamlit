@@ -509,11 +509,10 @@ export class WidgetStateManager {
    * Set a bidi component state value (persistent across reruns).
    * Sends data to backend in format: { state_updates: { eventType: value } }
    */
-  public setBidiComponentStateValue(
+  public setBidiComponentStateValue<T = unknown>(
     widget: WidgetInfo,
     eventType: string,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TODO: Replace 'any' with a more specific type.
-    value: any,
+    value: T,
     source: Source,
     fragmentId: string | undefined
   ): void {
@@ -547,11 +546,10 @@ export class WidgetStateManager {
    * Set a bidi component trigger value (reset to None on rerun).
    * Sends data to backend in format: { trigger_updates: { eventType: value } }
    */
-  public setBidiComponentTriggerValue(
+  public setBidiComponentTriggerValue<T = unknown>(
     widget: WidgetInfo,
     eventType: string,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TODO: Replace 'any' with a more specific type.
-    value: any,
+    value: T,
     source: Source,
     fragmentId: string | undefined
   ): void {
