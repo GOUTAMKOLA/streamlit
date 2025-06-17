@@ -70,6 +70,10 @@ class SafeSessionState:
                 metadata, user_key, initial_widget_state
             )
 
+    def are_bidi_triggers_reset_this_run(self) -> bool:
+        with self._lock:
+            return self._state.are_bidi_triggers_reset_this_run()
+
     def on_script_will_rerun(self, latest_widget_states: WidgetStatesProto) -> None:
         self._yield_callback()
         with self._lock:

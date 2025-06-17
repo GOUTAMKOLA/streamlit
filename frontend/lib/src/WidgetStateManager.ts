@@ -517,11 +517,29 @@ export class WidgetStateManager {
     source: Source,
     fragmentId: string | undefined
   ): void {
-    const updateData = {
-      state_updates: { [eventType]: value },
+    // Get existing data or create empty structure
+    const existingJsonValue = this.getJsonValue(widget)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TODO: Replace 'any' with a more specific type.
+    let existingData: any = {}
+
+    try {
+      if (existingJsonValue) {
+        existingData = JSON.parse(existingJsonValue)
+      }
+    } catch {
+      // If parsing fails, start with empty structure
+      existingData = {}
     }
-    this.createWidgetState(widget, source).jsonValue =
-      JSON.stringify(updateData)
+
+    // Preserve only state_updates from existing data (not trigger_updates)
+    const newData = {
+      state_updates: existingData.state_updates || {},
+    }
+
+    // Merge the new state value
+    newData.state_updates[eventType] = value
+
+    this.createWidgetState(widget, source).jsonValue = JSON.stringify(newData)
     this.onWidgetValueChanged(widget.formId, source, fragmentId)
   }
 
@@ -537,11 +555,32 @@ export class WidgetStateManager {
     source: Source,
     fragmentId: string | undefined
   ): void {
-    const updateData = {
+    // Get existing data or create empty structure
+    const existingJsonValue = this.getJsonValue(widget)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TODO: Replace 'any' with a more specific type.
+    let existingData: any = {}
+
+    try {
+      if (existingJsonValue) {
+        existingData = JSON.parse(existingJsonValue)
+      }
+    } catch {
+      // If parsing fails, start with empty structure
+      existingData = {}
+    }
+
+    // Preserve state_updates from existing data, but only send the current trigger_updates
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TODO: Replace 'any' with a more specific type.
+    const newData: any = {
       trigger_updates: { [eventType]: value },
     }
-    this.createWidgetState(widget, source).jsonValue =
-      JSON.stringify(updateData)
+
+    // Include state_updates if they exist (preserve persistent state)
+    if (existingData.state_updates) {
+      newData.state_updates = existingData.state_updates
+    }
+
+    this.createWidgetState(widget, source).jsonValue = JSON.stringify(newData)
     this.onWidgetValueChanged(widget.formId, source, fragmentId)
   }
 
