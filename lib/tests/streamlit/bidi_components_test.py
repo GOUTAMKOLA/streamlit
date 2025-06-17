@@ -107,6 +107,9 @@ class BidiComponentsTest(DeltaGeneratorTestCase):
         my_comp = my_component(key="my_comp")
         assert my_comp.get("value") == "bar"
 
+    # TODO: This test does not pass yet.
+    # On re-run, my_comp.get("value") is still "baz".
+    # This is due to an implementation bug.
     def test_set_trigger_value(self):
         """Test that setTriggerValue updates the component's state for one run."""
 
@@ -133,8 +136,11 @@ class BidiComponentsTest(DeltaGeneratorTestCase):
         self.script_run_ctx.widget_ids_this_run.clear()
 
         my_comp = my_component(key="my_comp")
+        # print(my_comp.get("value")) - This prints "baz"
         assert my_comp.get("value") is None
 
+    # TODO: This does not work yet, there is an implementation bug where the
+    # callback is not called when the state is updated.
     def test_on_change_callback(self):
         """Test that on_{state_name}_change callbacks are triggered correctly."""
         callback_mock = MagicMock()
@@ -159,6 +165,10 @@ class BidiComponentsTest(DeltaGeneratorTestCase):
         self.script_run_ctx.session_state.on_script_will_rerun(widget_states)
         callback_mock.assert_called_once_with("trigger_change")
 
+    # TODO: This does not pass yet.
+    # The last line fails because it is a trigger, which is the same root cause
+    # error as seen in `test_set_trigger_value`. This is due to an
+    # implementation bug.
     def test_return_value_and_delta_generator(self):
         """Test the component's return value and that the DeltaGenerator works."""
 
@@ -193,4 +203,5 @@ class BidiComponentsTest(DeltaGeneratorTestCase):
 
         my_comp = my_component(key="my_comp")
         assert my_comp.x == 1
+        # print(my_comp.get("z")) - This prints "3"
         assert my_comp.get("z") is None

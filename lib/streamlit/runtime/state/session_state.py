@@ -49,7 +49,6 @@ from streamlit.runtime.state.query_params import QueryParams
 from streamlit.runtime.stats import CacheStat, CacheStatsProvider, group_stats
 
 if TYPE_CHECKING:
-    from streamlit.components.v2.bidi_component import BidiComponentWidgetState
     from streamlit.runtime.session_manager import SessionManager
 
 
@@ -137,7 +136,9 @@ class WStates(MutableMapping[str, Any]):
             )
         )
 
+        # Store the deserialized value back into the state mapping.
         self.states[k] = Value(deserialized)
+
         return deserialized
 
     def __setitem__(self, k: str, v: WState) -> None:
@@ -388,15 +389,25 @@ class SessionState:
         _old_state dict, and then clear our current session_state and
         widget_state.
         """
+        # Preserve widget metadata so that callbacks can be executed *before*
+        # widgets are re-registered in the next script run. Without this, the
+        # metadata (including callback references) would be lost, preventing
+        # us from detecting and invoking the appropriate callbacks.
+        preserved_metadata = self._new_widget_state.widget_metadata.copy()
+
         for key_or_wid in self:
             try:
                 self._old_state[key_or_wid] = self[key_or_wid]
             except KeyError:  # noqa: PERF203
-                # handle key errors from widget state not having metadata gracefully
+                # Handle key errors from widget state not having metadata gracefully
                 # https://github.com/streamlit/streamlit/issues/7206
                 pass
+
         self._new_session_state.clear()
         self._new_widget_state.clear()
+
+        # Restore the preserved metadata after clearing the widget state.
+        self._new_widget_state.widget_metadata = preserved_metadata
 
     def clear(self) -> None:
         """Reset self completely, clearing all current and old values."""
@@ -576,121 +587,119 @@ class SessionState:
         self._call_callbacks()
 
     def _call_callbacks(self) -> None:
-        """Call any callback associated with each widget whose value
-        changed between the previous and current script runs, or whose
-        trigger_value is set.
+        """Invoke all widget callbacks based on value or trigger changes.
+
+        The logic is now generic:
+        • Widgets may register an arbitrary mapping ``callbacks`` whose keys are
+          event names (e.g. "change", "click", "row_select").
+        • For every widget we compare the *per-event* value from the current
+          run against the previous run.  A callback fires when:
+
+            – The event is "click"  ➜ the new event value is truthy.
+            – Any other event       ➜ ``new != old``.
+        • The event value is extracted via :py:meth:`_extract_event_value`.
         """
-        from streamlit.components.v2.bidi_component import BidiComponentWidgetState
+
         from streamlit.runtime.scriptrunner import RerunException
 
-        # Iterate over a copy of keys in case callbacks modify underlying collections.
-        widget_ids_to_process = list(self._new_widget_state.states.keys())
+        _MISSING = object()
 
-        for wid in widget_ids_to_process:
-            metadata = self._new_widget_state.widget_metadata.get(wid)
-            if not metadata or not metadata.callbacks:
+        # ------------------------------------------------------------------
+        # Helper to execute a callback with fragment-context awareness
+        # ------------------------------------------------------------------
+        def _execute_callback(
+            fn: Callable[..., None],
+            meta: WidgetMetadata[Any],
+            cb_args: tuple[Any, ...],
+            cb_kwargs: dict[str, Any],
+        ) -> None:
+            ctx = get_script_run_ctx()
+            if ctx and meta.fragment_id is not None:
+                ctx.in_fragment_callback = True
+                fn(*cb_args, **cb_kwargs)
+                ctx.in_fragment_callback = False
+            else:
+                fn(*cb_args, **cb_kwargs)
+
+        # ------------------------------------------------------------------
+        # Walk every widget that has at least one callback
+        # ------------------------------------------------------------------
+        for wid, meta in list(self._new_widget_state.widget_metadata.items()):
+            if not meta.callbacks:
                 continue
 
-            args = metadata.callback_args or ()
-            kwargs = metadata.callback_kwargs or {}
-
-            # Helper to execute a callback with fragment context handling
-            def execute_callback(
-                callback_fn: Callable,
-                metadata: WidgetMetadata[Any],
-                metadata_args: tuple[Any, ...],
-                metadata_kwargs: dict[str, Any],
-            ):
-                ctx = get_script_run_ctx()
-                if ctx and metadata.fragment_id is not None:
-                    ctx.in_fragment_callback = True
-                    callback_fn(*metadata_args, **metadata_kwargs)
-                    ctx.in_fragment_callback = False
-                else:
-                    callback_fn(*metadata_args, **metadata_kwargs)
-
-            # Check if this is a bidi component with advanced callback handling
             try:
-                widget_state = self._new_widget_state[wid]
-                is_bidi_component = isinstance(widget_state, BidiComponentWidgetState)
-            except (KeyError, AttributeError):
-                is_bidi_component = False
+                new_val = self._new_widget_state[wid]
+            except KeyError:
+                continue  # Widget vanished mid-run?
 
-            if is_bidi_component and isinstance(widget_state, BidiComponentWidgetState):
-                # Handle bidi component callbacks with event-specific values
-                for event_name, callback_fn in metadata.callbacks.items():
-                    try:
-                        # Check if there's a trigger value for this event (transient)
-                        trigger_value = widget_state.trigger_values.get(event_name)
-                        if trigger_value is not None:
-                            # Call callback with the specific trigger value as the single argument
-                            execute_callback(
-                                callback_fn, metadata, (trigger_value,), {}
+            old_val = self._old_state.get(wid, _MISSING)
+
+            for event_name, cb_fn in meta.callbacks.items():
+                try:
+                    evt_new = self._extract_event_value(new_val, event_name)
+                    evt_old = self._extract_event_value(old_val, event_name)
+
+                    fired = False
+                    if event_name == "click":
+                        fired = bool(evt_new)
+                    else:
+                        fired = evt_new != evt_old
+
+                    if fired:
+                        # Back-compat: honour the original args/kwargs for the
+                        # two legacy events when they were traditionally the
+                        # only ones available.
+                        if event_name in {"change", "click"} and (
+                            meta.callback_args or meta.callback_kwargs
+                        ):
+                            _execute_callback(
+                                cb_fn,
+                                meta,
+                                meta.callback_args or (),
+                                meta.callback_kwargs or {},
                             )
-                            continue
+                        else:
+                            _execute_callback(cb_fn, meta, (evt_new,), {})
+                except RerunException:
+                    st.warning("Calling st.rerun() within a callback is a no-op.")
 
-                        # Check if there's a state value for this event that changed (persistent)
-                        state_value = widget_state.state_values.get(event_name)
-                        if state_value is not None:
-                            # Check if this value changed compared to old state
-                            old_widget_state = self._old_state.get(wid)
-                            if isinstance(old_widget_state, BidiComponentWidgetState):
-                                old_state_value = old_widget_state.state_values.get(
-                                    event_name
-                                )
-                                if state_value != old_state_value:
-                                    # Call callback with the specific state value as the single argument
-                                    execute_callback(
-                                        callback_fn, metadata, (state_value,), {}
-                                    )
+    # ------------------------------------------------------------------
+    # Helper utilities for the generic callback runner
+    # ------------------------------------------------------------------
 
-                    except RerunException:
-                        st.warning("Calling st.rerun() within a callback is a no-op.")
-            else:
-                # Handle legacy widget callbacks
-                # 1. Check for trigger-based callbacks (e.g., "click")
-                #    This requires getting the serialized protobuf state.
-                widget_proto_state = self._new_widget_state.get_serialized(wid)
-                if widget_proto_state and widget_proto_state.trigger_value:
-                    click_callback = metadata.callbacks.get("click")
-                    if click_callback:
-                        try:
-                            execute_callback(click_callback, metadata, args, kwargs)
-                        except RerunException:
-                            st.warning(
-                                "Calling st.rerun() within a callback is a no-op."
-                            )
+    @staticmethod
+    def _extract_event_value(value: Any, event: str) -> Any:
+        """Return the sub-value that corresponds to *event*.
 
-                # 2. Check for value-changed based callbacks (e.g., "change")
-                #    _widget_changed compares the primary deserialized value against _old_state.
-                if self._widget_changed(wid):
-                    change_callback = metadata.callbacks.get("change")
-                    if change_callback:
-                        try:
-                            # Ensure we don't call the same callback instance twice if it was already
-                            # triggered by trigger_value (e.g. if "click" and "change" are the same function).
-                            # This check is subtle: if trigger_value was true AND _widget_changed is true,
-                            # and both 'click' and 'change' map to the same callback object,
-                            # it would have already been called by the block above.
-                            # If they map to *different* functions, both will be called if their
-                            # respective conditions (trigger_value set, primary value changed) are met.
+        Rules
+        -----
+        1.  If *value* is the special sentinel ``_MISSING`` return ``None``.
+        2.  Mapping (dict / AttributeDictionary) ➜ ``value.get(event)``.
+        3.  Scalar ➜
+            • event == "change" ➜ the scalar itself.
+            • otherwise         ➜ ``None`` (no per-event value).
+        4.  Fallback – try attribute access.
+        """
 
-                            # A simple way to avoid double execution for the *same callback instance*:
-                            # If 'click' callback exists, was triggered, and is the same as 'change' callback.
-                            was_click_triggered_for_same_fn = (
-                                widget_proto_state
-                                and widget_proto_state.trigger_value
-                                and metadata.callbacks.get("click") == change_callback
-                            )
+        # Sentinel propagated by caller means "no previous value".
+        if value is None or value is ...:  # type: ignore[comparison-overlap]
+            return None
 
-                            if not was_click_triggered_for_same_fn:
-                                execute_callback(
-                                    change_callback, metadata, args, kwargs
-                                )
-                        except RerunException:
-                            st.warning(
-                                "Calling st.rerun() within a callback is a no-op."
-                            )
+        # Many widgets return an AttributeDictionary (subclass of dict).
+        if isinstance(value, dict):
+            return value.get(event)
+
+        # Scalars (int/str/float/bool) – treat them as the value for the
+        # implicit "change" event.
+        if event == "change":
+            return value
+
+        # Last-ditch: attribute access (rare).
+        try:
+            return getattr(value, event)
+        except Exception:
+            return None
 
     def _widget_changed(self, widget_id: str) -> bool:
         """True if the given widget's value changed between the previous
@@ -716,93 +725,83 @@ class SessionState:
         self._remove_stale_widgets(widget_ids_this_run)
 
     def _reset_triggers(self) -> None:
-        """Set all trigger values in our state dictionary to False."""
-        for state_id in self._new_widget_state:
-            metadata = self._new_widget_state.widget_metadata.get(state_id)
-            if metadata is not None:
-                if metadata.value_type == "trigger_value":
-                    self._new_widget_state[state_id] = Value(False)
-                elif metadata.value_type in {
-                    "string_trigger_value",
-                    "chat_input_value",
-                }:
-                    self._new_widget_state[state_id] = Value(None)
+        """Reset all trigger-style values after a script run.
 
-        for state_id in self._old_state:
-            metadata = self._new_widget_state.widget_metadata.get(state_id)
-            if metadata is not None:
-                if metadata.value_type == "trigger_value":
-                    self._old_state[state_id] = False
-                elif metadata.value_type in {
-                    "string_trigger_value",
-                    "chat_input_value",
-                }:
-                    self._old_state[state_id] = None
+        Behaviour
+        ---------
+        1. **Proto-based triggers** (classic Button, FileUploader, ChatInput):
+            • `trigger_value`      ➜ `False`
+            • `string_trigger_value`, `chat_input_value` ➜ `None`
 
-        # Reset bidi component trigger values
-        self._reset_bidi_component_triggers()
-
-    def _reset_bidi_component_triggers(self) -> None:
-        """Reset all trigger values in bidi component widget states to None.
-
-        This method leverages Streamlit's existing widget lifecycle to handle
-        the new trigger reset functionality for bidi components without
-        requiring complex cross-run tracking.
+        2. **Mapping-based widgets** that return a `dict` / `AttributeDictionary`
+           with per-event keys:
+            • For every *event* that has a registered callback **and is not** the
+              conventional "change" event, we replace the value with ``None``.
+            • This applies to both current-run (`_new_widget_state`) and cached
+              (`_old_state`) containers so that subsequent runs start fresh.
         """
-        # Import here to avoid circular imports
-        from streamlit.components.v2.bidi_component import BidiComponentWidgetState
 
-        # Check all widget states for bidi components
-        for widget_id in self._new_widget_state.states:
-            try:
-                # Access the raw widget state without deserialization
-                # self._new_widget_state[widget_id] goes through __getitem__ which deserializes
-                # Instead, we access the raw state directly from the states dict
-                raw_state = self._new_widget_state.states.get(widget_id)
-
-                if not raw_state:
+        # --------------------------------------------------------------
+        # 1. Proto-based triggers (legacy widgets)
+        # --------------------------------------------------------------
+        def _reset_scalar_trigger_container(container):
+            for state_id in list(container):
+                metadata = self._new_widget_state.widget_metadata.get(state_id)
+                if metadata is None:
                     continue
 
-                # Check if this is a Value object (deserialized widget state)
-                if isinstance(raw_state, Value):
-                    widget_value = raw_state.value
+                if metadata.value_type == "trigger_value":
+                    container[state_id] = (
+                        Value(False) if isinstance(container, WStates) else False
+                    )  # type: ignore[arg-type]
+                elif metadata.value_type in {
+                    "string_trigger_value",
+                    "chat_input_value",
+                }:
+                    container[state_id] = (
+                        Value(None) if isinstance(container, WStates) else None
+                    )  # type: ignore[arg-type]
 
-                    # Check if this is a BidiComponentWidgetState directly
-                    if isinstance(widget_value, BidiComponentWidgetState):
-                        # Reset all trigger values to None for this bidi component
-                        if (
-                            hasattr(widget_value, "trigger_values")
-                            and widget_value.trigger_values
-                        ):
-                            for trigger_key in list(widget_value.trigger_values.keys()):
-                                widget_value.trigger_values[trigger_key] = None
+        _reset_scalar_trigger_container(self._new_widget_state)
+        _reset_scalar_trigger_container(self._old_state)
 
-                elif isinstance(raw_state, Serialized):
-                    # For serialized states, we can't easily access the BidiComponentWidgetState
-                    # without going through deserialization. We'll skip these for now and let
-                    # the deserialization process handle trigger reset when the state is accessed.
+        # --------------------------------------------------------------
+        # 2. Mapping-based widgets (multi-event, incl. bidi_component)
+        # --------------------------------------------------------------
+        def _reset_mapping_triggers(container, is_new_state: bool) -> None:
+            # container: either self._new_widget_state.states (dict[str, WState]) or self._old_state
+            items = (
+                container.states.items()
+                if isinstance(container, WStates)
+                else container.items()
+            )
+
+            for wid, raw_val in list(items):
+                metadata = self._new_widget_state.widget_metadata.get(wid)
+                if not metadata or not metadata.callbacks:
                     continue
 
-            except (KeyError, AttributeError, TypeError):
-                # Handle cases where widget state doesn't exist or doesn't have expected structure
-                # This is expected for non-bidi components
-                continue
+                # Obtain the actual user-visible value (dict/AttrDict)
+                if isinstance(container, WStates):
+                    if not isinstance(raw_val, Value):
+                        continue  # ignore serialized entries
+                    val = raw_val.value
+                else:
+                    val = raw_val
 
-        # Also check _old_state for any bidi components that might be there
-        for widget_id, widget_value in self._old_state.items():
-            try:
-                if isinstance(widget_value, BidiComponentWidgetState):
-                    # Reset all trigger values to None for this bidi component
-                    if (
-                        hasattr(widget_value, "trigger_values")
-                        and widget_value.trigger_values
-                    ):
-                        for trigger_key in list(widget_value.trigger_values.keys()):
-                            widget_value.trigger_values[trigger_key] = None
+                if not isinstance(val, dict):
+                    continue
 
-            except (AttributeError, TypeError):
-                # Handle cases where widget state doesn't have expected structure
-                continue
+                # For each event (excluding "change") that had a callback,
+                # set to None.
+                for evt in metadata.callbacks.keys():
+                    if evt == "change":
+                        continue
+                    if val.get(evt) is not None:
+                        val[evt] = None
+
+        _reset_mapping_triggers(self._new_widget_state, True)
+        _reset_mapping_triggers(self._old_state, False)
 
     def _remove_stale_widgets(self, active_widget_ids: set[str]) -> None:
         """Remove widget state for widgets whose ids aren't in `active_widget_ids`."""
@@ -879,93 +878,6 @@ class SessionState:
         # We return a copy, so that reference types can't be accidentally
         # mutated by user code.
         widget_value = cast("T", self[widget_id])
-        widget_value = deepcopy(widget_value)
-
-        # widget_value_changed indicates to the caller that the widget's
-        # current value is different from what is in the frontend.
-        widget_value_changed = user_key is not None and self.is_new_state_value(
-            user_key
-        )
-
-        return RegisterWidgetResult(widget_value, widget_value_changed)
-
-    def register_bidi_widget(
-        self,
-        metadata: WidgetMetadata[T],
-        user_key: str | None,
-        initial_widget_state: BidiComponentWidgetState | None = None,
-    ) -> RegisterWidgetResult[T]:
-        """Register a bidi component widget with dual-mode state management.
-
-        This method handles the specialized registration logic for bidi components
-        that maintain both persistent state values and transient trigger values.
-
-        Parameters
-        ----------
-        metadata : WidgetMetadata[T]
-            The widget metadata containing registration information.
-        user_key : str | None
-            Optional user-provided key for the widget.
-        initial_widget_state : BidiComponentWidgetState | None
-            Initial widget state for first registration.
-
-        Returns
-        -------
-        RegisterWidgetResult[T]
-            Contains the widget's current value and update flag.
-        """
-        # Import here to avoid circular imports
-        from streamlit.components.v2.bidi_component import BidiComponentWidgetState
-
-        widget_id = metadata.id
-
-        self._set_widget_metadata(metadata)
-        if user_key is not None:
-            # If the widget has a user_key, update its user_key:widget_id mapping
-            self._set_key_widget_mapping(widget_id, user_key)
-
-        if widget_id not in self and (user_key is None or user_key not in self):
-            # This is the first time the widget is registered, so we initialize
-            # it with a BidiComponentWidgetState
-            if initial_widget_state is None:
-                initial_widget_state = BidiComponentWidgetState()
-
-            # Use deserializer to create the initial return value
-            deserializer = metadata.deserializer
-            initial_widget_value = deepcopy(deserializer(None))
-
-            # Store the BidiComponentWidgetState in widget state
-            self._new_widget_state.set_from_value(widget_id, initial_widget_state)
-
-            # Also store the deserialized value for immediate return
-            # This maintains compatibility with existing widget behavior
-            if hasattr(initial_widget_value, "value"):
-                # If the deserializer returns something with a 'value' attribute,
-                # we'll use that as the basis for our return
-                pass
-            else:
-                # Otherwise, create a state object with the default value
-                initial_widget_value = {"value": None}
-
-        # Get the current value of the widget for use as its return value.
-        # For bidi components, we need to merge state and trigger values
-        try:
-            widget_state = self._new_widget_state[widget_id]
-            if isinstance(widget_state, BidiComponentWidgetState):
-                # Merge state and trigger values for the return value
-                merged_values = widget_state.state_values.copy()
-                merged_values.update(widget_state.trigger_values)
-
-                # Use the deserializer to create the proper return format
-                deserializer = metadata.deserializer
-                widget_value = deserializer(merged_values)
-            else:
-                # Fallback to regular widget behavior
-                widget_value = cast("T", self[widget_id])
-        except (KeyError, AttributeError):
-            # Fallback to regular widget behavior if something goes wrong
-            widget_value = cast("T", self[widget_id])
-
         widget_value = deepcopy(widget_value)
 
         # widget_value_changed indicates to the caller that the widget's

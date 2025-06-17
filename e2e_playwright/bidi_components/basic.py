@@ -14,7 +14,7 @@
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 import streamlit as st
 
@@ -118,7 +118,7 @@ export default function(component) {
       text: event.target.text.value,
     }
     console.log("Form submitted with values", formValues)
-    setStateValue("form", formValues)
+    setStateValue("value", formValues)
   }
 
   form.addEventListener("submit", handleSubmit)
@@ -160,8 +160,7 @@ div {
         *,
         key: str | None = None,
         data: Any | None = None,
-        on_change: Callable | None = None,
-        on_click: Callable | None = None,
+        **kwargs,
     ) -> BidiComponentState:
         out = st.components.v2.component(
             name="my_component",
@@ -171,8 +170,7 @@ div {
             isolate_styles=True,
             key=key,
             data=data,
-            on_change=on_change,
-            on_click=on_click,
+            **kwargs,
         )
         return out
 
@@ -196,8 +194,8 @@ div {
     result = my_component(
         key="my_component_1",
         data={"label": "Some data from python"},
-        on_change=handle_change,
-        on_click=handle_click,
+        on_value_change=handle_change,
+        on_clicked_change=handle_click,
     )
 
     st.write(f"Result: {result}")

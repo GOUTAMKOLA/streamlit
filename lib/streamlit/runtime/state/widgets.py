@@ -30,7 +30,6 @@ from streamlit.runtime.state.common import (
 )
 
 if TYPE_CHECKING:
-    from streamlit.components.v2.bidi_component import BidiComponentWidgetState
     from streamlit.runtime.scriptrunner import ScriptRunContext
 
 
@@ -146,97 +145,3 @@ def register_widget_from_metadata(
     user_key = user_key_from_element_id(widget_id)
 
     return ctx.session_state.register_widget(metadata, user_key)
-
-
-def register_bidi_widget(
-    element_id: str,
-    *,
-    deserializer: WidgetDeserializer[T],
-    serializer: WidgetSerializer[T],
-    ctx: ScriptRunContext | None,
-    callbacks: dict[str, WidgetCallback] | None = None,
-    value_type: ValueFieldName,
-    initial_widget_state: BidiComponentWidgetState | None = None,
-) -> RegisterWidgetResult[T]:
-    """Register a bidi component widget with dual-mode state management.
-
-    This function is specifically designed for bidi components that need to handle
-    both persistent state values and transient trigger values. The widget state
-    contains two separate dictionaries: state_values (persistent) and trigger_values
-    (reset to None on each script run).
-
-    Parameters
-    ----------
-    element_id : str
-        The id of the element. Must be unique.
-    deserializer : WidgetDeserializer[T]
-        Called to convert a widget's protobuf value to the value returned by
-        its st.<widget_name> function.
-    serializer : WidgetSerializer[T]
-        Called to convert a widget's value to its protobuf representation.
-    ctx : ScriptRunContext or None
-        Used to ensure uniqueness of widget IDs, and to look up widget values.
-    callbacks : dict[str, WidgetCallback] or None
-        A dictionary of callbacks for different widget event types.
-    value_type: ValueFieldName
-        The value_type the widget is going to use.
-    initial_widget_state : BidiComponentWidgetState or None
-        Initial widget state for first registration.
-
-    Returns
-    -------
-    register_widget_result : RegisterWidgetResult[T]
-        Provides information on which value to return to the widget caller,
-        and whether the UI needs updating.
-    """
-    # Create the widget's metadata for bidi components
-    metadata = WidgetMetadata(
-        element_id,
-        deserializer,
-        serializer,
-        value_type=value_type,
-        callbacks=callbacks,
-        callback_args=None,
-        callback_kwargs=None,
-        fragment_id=ctx.current_fragment_id if ctx else None,
-    )
-
-    # Use the specialized bidi widget registration logic
-    return register_bidi_widget_from_metadata(metadata, ctx, initial_widget_state)
-
-
-def register_bidi_widget_from_metadata(
-    metadata: WidgetMetadata[T],
-    ctx: ScriptRunContext | None,
-    initial_widget_state: BidiComponentWidgetState | None = None,
-) -> RegisterWidgetResult[T]:
-    """Register a bidi component widget using an already constructed WidgetMetadata.
-
-    This handles the specialized registration logic for bidi components with
-    dual-mode state management (state values + trigger values).
-
-    Parameters
-    ----------
-    metadata : WidgetMetadata[T]
-        The widget metadata containing registration information.
-    ctx : ScriptRunContext | None
-        Script run context for widget registration.
-    initial_widget_state : BidiComponentWidgetState | None
-        Initial widget state for first registration.
-
-    Returns
-    -------
-    RegisterWidgetResult[T]
-        Contains the widget's current value and update flag.
-    """
-    if ctx is None:
-        # Early-out if we don't have a script run context
-        return RegisterWidgetResult.failure(deserializer=metadata.deserializer)
-
-    widget_id = metadata.id
-    user_key = user_key_from_element_id(widget_id)
-
-    # Register the widget with session state, handling bidi-specific initialization
-    return ctx.session_state.register_bidi_widget(
-        metadata, user_key, initial_widget_state
-    )
