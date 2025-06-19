@@ -16,6 +16,10 @@ from __future__ import annotations
 import textwrap
 from typing import TYPE_CHECKING, Literal, cast
 
+from streamlit.deprecation_util import (
+    make_deprecated_name_warning,
+    show_deprecation_warning,
+)
 from streamlit.elements.lib.form_utils import FormData, current_form_id, is_in_form
 from streamlit.elements.lib.layout_utils import (
     Height,
@@ -242,7 +246,7 @@ class FormMixin:
         type: Literal["primary", "secondary", "tertiary"] = "secondary",
         icon: str | None = None,
         disabled: bool = False,
-        use_container_width: bool = False,
+        use_container_width: bool | None = None,
         width: Width = "content",
     ) -> bool:
         r"""Display a form submit button.
@@ -325,6 +329,12 @@ class FormMixin:
             ``enter_to_submit=False``.
 
         use_container_width : bool
+            .. deprecated:: 1.0.0
+                This parameter will be removed in a future version. Use the
+                ``width`` parameter instead. For ``use_container_width=True``,
+                use ``width="stretch"``. For ``use_container_width=False``,
+                use ``width="content"``.
+
             Whether to expand the button's width to fill its parent container.
             If ``use_container_width`` is ``False`` (default), Streamlit sizes
             the button to fit its contents. If ``use_container_width`` is
@@ -351,6 +361,18 @@ class FormMixin:
         """
         ctx = get_script_run_ctx()
 
+        if use_container_width is not None:
+            show_deprecation_warning(
+                make_deprecated_name_warning(
+                    "use_container_width",
+                    "width",
+                    "2025-10-31",
+                    "For `use_container_width=True`, use `width='stretch'`. "
+                    "For `use_container_width=False`, use `width='content'`.",
+                )
+            )
+            width = "stretch" if use_container_width else width
+
         # Checks whether the entered button type is one of the allowed options
         if type not in ["primary", "secondary", "tertiary"]:
             raise StreamlitAPIException(
@@ -367,7 +389,6 @@ class FormMixin:
             type=type,
             icon=icon,
             disabled=disabled,
-            use_container_width=use_container_width,
             ctx=ctx,
             width=width,
         )
@@ -383,7 +404,6 @@ class FormMixin:
         type: Literal["primary", "secondary", "tertiary"] = "secondary",
         icon: str | None = None,
         disabled: bool = False,
-        use_container_width: bool = False,
         ctx: ScriptRunContext | None = None,
         width: Width = "content",
     ) -> bool:
@@ -400,7 +420,6 @@ class FormMixin:
             type=type,
             icon=icon,
             disabled=disabled,
-            use_container_width=use_container_width,
             ctx=ctx,
             width=width,
         )
