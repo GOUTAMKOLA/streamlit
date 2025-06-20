@@ -212,7 +212,10 @@ export class WidgetStateManager {
   private triggerFlushResolvers: Array<() => void> = []
 
   /** Indicates whether we already scheduled a macrotask-level flush. */
-  private triggerFlushScheduled = false
+  private flushScheduled = false
+
+  /** The fragmentId associated with the currently scheduled flush (if any). */
+  private scheduledFragmentId: string | undefined
 
   constructor(props: Props) {
     this.props = props
@@ -378,27 +381,8 @@ export class WidgetStateManager {
       // Queue resolver so callers still get the same promise-based API.
       this.triggerFlushResolvers.push(resolve)
 
-      // If a flush is already scheduled we don't need to schedule another one.
-      if (this.triggerFlushScheduled) {
-        return
-      }
-
-      this.triggerFlushScheduled = true
-
-      setTimeout(() => {
-        // Send a *single* widgets update containing **all** pending triggers.
-        this.sendUpdateWidgetsMessage(fragmentId)
-
-        // Clean-up temporary widget states so they don't leak into future updates.
-        this.pendingTriggerIds.forEach(id => this.deleteWidgetState(id))
-        this.pendingTriggerIds.clear()
-
-        // Resolve all promises that were waiting for this flush.
-        this.triggerFlushResolvers.forEach(r => r())
-        this.triggerFlushResolvers = []
-
-        this.triggerFlushScheduled = false
-      }, 0)
+      // Schedule (or reuse) a macrotask-level flush.
+      this.scheduleFlush(fragmentId)
     })
   }
 
@@ -736,7 +720,8 @@ export class WidgetStateManager {
     if (isValidFormId(formId)) {
       this.syncFormsWithPendingChanges()
     } else if (source.fromUi) {
-      this.sendUpdateWidgetsMessage(fragmentId)
+      // Batch value changes that occur within the same JavaScript macrotask.
+      this.scheduleFlush(fragmentId)
     }
   }
 
@@ -984,6 +969,43 @@ export class WidgetStateManager {
     } else {
       this.elementStates.delete(elementId)
     }
+  }
+
+  /**
+   * Schedule a macrotask-level flush of pending widget updates (triggers and
+   * regular value changes). Multiple calls within the same macrotask will be
+   * coalesced into a single `updateWidgets` message.
+   */
+  private scheduleFlush(fragmentId: string | undefined): void {
+    // Update the stored fragmentId if we don't have one yet. If multiple calls
+    // happen and at least one of them specifies a fragmentId, we keep the
+    // first non-undefined value.
+    if (this.scheduledFragmentId === undefined) {
+      this.scheduledFragmentId = fragmentId
+    }
+
+    if (this.flushScheduled) {
+      return
+    }
+
+    this.flushScheduled = true
+
+    setTimeout(() => {
+      // Send a *single* widgets update containing **all** pending updates.
+      this.sendUpdateWidgetsMessage(this.scheduledFragmentId)
+
+      // Clean-up temporary trigger widget states so they don't leak into future updates.
+      this.pendingTriggerIds.forEach(id => this.deleteWidgetState(id))
+      this.pendingTriggerIds.clear()
+
+      // Resolve all promises that were waiting for this flush.
+      this.triggerFlushResolvers.forEach(r => r())
+      this.triggerFlushResolvers = []
+
+      // Reset scheduling flags.
+      this.flushScheduled = false
+      this.scheduledFragmentId = undefined
+    }, 0)
   }
 }
 

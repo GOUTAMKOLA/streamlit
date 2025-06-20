@@ -16,6 +16,7 @@
 
 import { Mock } from "vitest"
 import { enableMapSet, enablePatches } from "immer"
+import { waitFor } from "@testing-library/dom"
 
 import {
   ArrowTable as ArrowTableProto,
@@ -102,23 +103,29 @@ describe("Widget State Manager", () => {
   }
 
   /** Assert calls of our callback functions. */
-  const assertCallbacks = ({ insideForm }: { insideForm: boolean }): void => {
+  const assertCallbacks = async ({
+    insideForm,
+  }: {
+    insideForm: boolean
+  }): Promise<void> => {
     if (insideForm) {
       expect(sendBackMsg).not.toHaveBeenCalled()
     } else {
-      expect(sendBackMsg).toHaveBeenCalledTimes(1)
-      expect(sendBackMsg).toHaveBeenCalledWith(
-        expect.anything(),
-        undefined, // fragmentId
-        undefined,
-        undefined
-      )
+      await waitFor(() => {
+        expect(sendBackMsg).toHaveBeenCalledTimes(1)
+        expect(sendBackMsg).toHaveBeenCalledWith(
+          expect.anything(),
+          undefined, // fragmentId
+          undefined,
+          undefined
+        )
+      })
     }
   }
 
   it.each([false, true])(
-    "sets string value correctly (insideForm=%p)",
-    insideForm => {
+    "sets string value correctly (insideForm=%s)",
+    async insideForm => {
       const widget = getWidget({ insideForm })
       widgetMgr.setStringValue(
         widget,
@@ -127,37 +134,37 @@ describe("Widget State Manager", () => {
         undefined
       )
       expect(widgetMgr.getStringValue(widget)).toBe("mockStringValue")
-      assertCallbacks({ insideForm })
+      await assertCallbacks({ insideForm })
     }
   )
 
   it.each([false, true])(
-    "sets boolean value correctly (insideForm=%p)",
-    insideForm => {
+    "sets boolean value correctly (insideForm=%s)",
+    async insideForm => {
       const widget = getWidget({ insideForm })
       widgetMgr.setBoolValue(widget, true, { fromUi: true }, undefined)
       expect(widgetMgr.getBoolValue(widget)).toBe(true)
-      assertCallbacks({ insideForm })
+      await assertCallbacks({ insideForm })
     }
   )
 
   it.each([false, true])(
-    "sets int value correctly (insideForm=%p)",
-    insideForm => {
+    "sets int value correctly (insideForm=%s)",
+    async insideForm => {
       const widget = getWidget({ insideForm })
       widgetMgr.setIntValue(widget, 100, { fromUi: true }, undefined)
       expect(widgetMgr.getIntValue(widget)).toBe(100)
-      assertCallbacks({ insideForm })
+      await assertCallbacks({ insideForm })
     }
   )
 
   it.each([false, true])(
-    "sets float value correctly (insideForm=%p)",
-    insideForm => {
+    "sets float value correctly (insideForm=%s)",
+    async insideForm => {
       const widget = getWidget({ insideForm })
       widgetMgr.setDoubleValue(widget, 3.14, { fromUi: true }, undefined)
       expect(widgetMgr.getDoubleValue(widget)).toBe(3.14)
-      assertCallbacks({ insideForm })
+      await assertCallbacks({ insideForm })
     }
   )
 
@@ -171,12 +178,12 @@ describe("Widget State Manager", () => {
 
     // @ts-expect-error
     expect(widgetMgr.getWidgetState(widget)).toBe(undefined)
-    assertCallbacks({ insideForm: false })
+    await assertCallbacks({ insideForm: false })
   })
 
   it.each([false, true])(
-    "sets string array value correctly (insideForm=%p)",
-    insideForm => {
+    "sets string array value correctly (insideForm=%s)",
+    async insideForm => {
       const widget = getWidget({ insideForm })
       widgetMgr.setStringArrayValue(
         widget,
@@ -191,13 +198,13 @@ describe("Widget State Manager", () => {
         "bar",
         "baz",
       ])
-      assertCallbacks({ insideForm })
+      await assertCallbacks({ insideForm })
     }
   )
 
   it.each([false, true])(
-    "sets int array value correctly (insideForm=%p)",
-    insideForm => {
+    "sets int array value correctly (insideForm=%s)",
+    async insideForm => {
       const widget = getWidget({ insideForm })
       widgetMgr.setIntArrayValue(
         widget,
@@ -206,13 +213,13 @@ describe("Widget State Manager", () => {
         undefined
       )
       expect(widgetMgr.getIntArrayValue(widget)).toEqual([4, 5, 6])
-      assertCallbacks({ insideForm })
+      await assertCallbacks({ insideForm })
     }
   )
 
   it.each([false, true])(
-    "sets float array value correctly (insideForm=%p)",
-    insideForm => {
+    "sets float array value correctly (insideForm=%s)",
+    async insideForm => {
       const widget = getWidget({ insideForm })
       widgetMgr.setDoubleArrayValue(
         widget,
@@ -223,13 +230,13 @@ describe("Widget State Manager", () => {
         undefined
       )
       expect(widgetMgr.getDoubleArrayValue(widget)).toEqual([1.1, 2.2, 3.3])
-      assertCallbacks({ insideForm })
+      await assertCallbacks({ insideForm })
     }
   )
 
   it.each([false, true])(
-    "sets ArrowTable value correctly (insideForm=%p)",
-    insideForm => {
+    "sets ArrowTable value correctly (insideForm=%s)",
+    async insideForm => {
       const widget = getWidget({ insideForm })
       widgetMgr.setArrowValue(
         widget,
@@ -238,13 +245,13 @@ describe("Widget State Manager", () => {
         undefined
       )
       expect(widgetMgr.getArrowValue(widget)).toEqual(MOCK_ARROW_TABLE)
-      assertCallbacks({ insideForm })
+      await assertCallbacks({ insideForm })
     }
   )
 
   it.each([false, true])(
-    "sets JSON value correctly (insideForm=%p)",
-    insideForm => {
+    "sets JSON value correctly (insideForm=%s)",
+    async insideForm => {
       const widget = getWidget({ insideForm })
       widgetMgr.setJsonValue(
         widget,
@@ -255,23 +262,23 @@ describe("Widget State Manager", () => {
         undefined
       )
       expect(widgetMgr.getJsonValue(widget)).toBe(JSON.stringify(MOCK_JSON))
-      assertCallbacks({ insideForm })
+      await assertCallbacks({ insideForm })
     }
   )
 
   it.each([false, true])(
-    "sets bytes value correctly (insideForm=%p)",
-    insideForm => {
+    "sets bytes value correctly (insideForm=%s)",
+    async insideForm => {
       const widget = getWidget({ insideForm })
       widgetMgr.setBytesValue(widget, MOCK_BYTES, { fromUi: true }, undefined)
       expect(widgetMgr.getBytesValue(widget)).toEqual(MOCK_BYTES)
-      assertCallbacks({ insideForm })
+      await assertCallbacks({ insideForm })
     }
   )
 
   it.each([false, true])(
-    "sets FileUploaderState value correctly (insideForm=%p)",
-    insideForm => {
+    "sets FileUploaderState value correctly (insideForm=%s)",
+    async insideForm => {
       const widget = getWidget({ insideForm })
       widgetMgr.setFileUploaderStateValue(
         widget,
@@ -284,7 +291,7 @@ describe("Widget State Manager", () => {
       expect(widgetMgr.getFileUploaderStateValue(widget)).toEqual(
         MOCK_FILE_UPLOADER_STATE
       )
-      assertCallbacks({ insideForm })
+      await assertCallbacks({ insideForm })
     }
   )
 
@@ -386,12 +393,14 @@ describe("Widget State Manager", () => {
         },
         "myFragmentId"
       )
-      expect(sendBackMsg).toHaveBeenCalledWith(
-        expect.anything(),
-        "myFragmentId",
-        undefined,
-        undefined
-      )
+      await waitFor(() => {
+        expect(sendBackMsg).toHaveBeenCalledWith(
+          expect.anything(),
+          "myFragmentId",
+          undefined,
+          undefined
+        )
+      })
     })
 
     // This test isn't parameterized like the ones above because setTriggerValue
