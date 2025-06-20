@@ -34,7 +34,6 @@ export default function(component) {
   }
 
   const handleTextChange = (event) => {
-  console.log("Text Changed")
     setStateValue("text", event.target.value)
   }
 
@@ -53,7 +52,6 @@ export default function(component) {
 
 HTML_CODE = """
 <div>
-  <h1>Hello World</h1>
   <label for="range">Range</label>
   <input type="range" id="range" min="0" max="100" value="50" />
   <label for="text">Text</label>
