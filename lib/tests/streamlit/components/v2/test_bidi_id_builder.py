@@ -23,8 +23,8 @@ from __future__ import annotations
 
 import pytest
 
-from lib.streamlit.errors import StreamlitAPIException
 from streamlit.components.v2.bidi_component import make_trigger_id
+from streamlit.errors import StreamlitAPIException
 
 
 @pytest.mark.parametrize(
