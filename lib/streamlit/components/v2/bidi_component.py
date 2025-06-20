@@ -27,7 +27,7 @@ from streamlit.errors import StreamlitAPIException
 from streamlit.proto.BidiComponent_pb2 import BidiComponent as BidiComponentProto
 from streamlit.runtime.metrics_util import gather_metrics
 from streamlit.runtime.scriptrunner_utils.script_run_context import get_script_run_ctx
-from streamlit.runtime.state.widgets import register_widget
+from streamlit.runtime.state import register_widget
 from streamlit.util import AttributeDictionary
 
 if TYPE_CHECKING:
@@ -103,70 +103,94 @@ class BidiComponentState(TypedDict, total=False):
 
 
 class BidiComponentResult(AttributeDictionary):
-    """
-    Result object from st.components.v2.component containing both
-    a DeltaGenerator and component state values.
+    """Rich return object for ``st.bidi_component``.
 
-    This class supports both .property and ["dictionary"] access patterns
-    and handles state values (persistent) vs trigger values (reset to None on rerun).
-
-    Attributes
-    ----------
-    delta_generator : DeltaGenerator
-        The DeltaGenerator instance for this component
-    **state_values : Any
-        The merged state and trigger values as attributes/dictionary keys
+    It behaves like a regular :class:`dict` *and* allows attribute-style
+    access to its keys, mirroring the behaviour of
+    :class:`streamlit.util.AttributeDictionary`. In addition, it surfaces the
+    :pyclass:`~streamlit.delta_generator.DeltaGenerator` instance responsible
+    for rendering the component via the dedicated :pyattr:`delta_generator`
+    property.
     """
 
-    def __init__(self, delta_generator: DeltaGenerator, state_values: dict[str, Any]):
-        # Store delta_generator as a special property and merge with state values
-        super().__init__({"delta_generator": delta_generator, **state_values})
+    def __init__(
+        self,
+        dg: DeltaGenerator,
+        state_vals: dict[str, Any] | None = None,
+        trigger_vals: dict[str, Any] | None = None,
+    ) -> None:
+        if state_vals is None:
+            state_vals = {}
+        if trigger_vals is None:
+            trigger_vals = {}
 
+        # We store the DeltaGenerator under a dedicated key so that callers can
+        # access it via both attribute and mapping syntax without colliding
+        # with user-supplied state or trigger names.
+        super().__init__(
+            {
+                "delta_generator": dg,
+                **state_vals,
+                **trigger_vals,
+            }
+        )
+
+    # Expose a typed property for convenient IDE auto-completion.
     @property
     def delta_generator(self) -> DeltaGenerator:
-        """Get the DeltaGenerator for this component."""
+        """Return the :class:`~streamlit.delta_generator.DeltaGenerator` that
+        rendered this component.
+        """
+
         return self["delta_generator"]
 
 
 @dataclass
 class BidiComponentSerde:
-    """Serialization/deserialization logic for BidiComponent with state/trigger differentiation.
+    """Serialization/deserialization logic for BidiComponent.
 
-    This new implementation supports the dual-mode state management system:
-    - State Values: Persistent across reruns until explicitly changed
-    - Trigger Values: Reset to None at the start of each script run
+    Assumes communication via JSON strings.
     """
 
     def deserialize(self, ui_value: str | dict | None) -> BidiComponentState:
-        """Deserialize the state sent from the frontend.
+        """Deserialize the state from the frontend.
 
-        The frontend is expected to send a JSON-serialisable mapping whose keys
-        correspond to event names (including ordinary persistent values and
-        trigger-style events). For legacy reasons a plain scalar may still be
-        sent – in that case we wrap it in a one-item mapping with key
-        ``"value"``.
+        Args:
+            ui_value: The JSON string received from the frontend.
+
+        Returns
+        -------
+            The deserialized state wrapped in an AttributeDictionary.
         """
         try:
             if isinstance(ui_value, dict):
-                data = ui_value
+                deserialized_value = ui_value
             elif ui_value is not None:
-                # Scalars or JSON-encoded strings
                 if isinstance(ui_value, (int, float, bool)):
-                    data = {"value": ui_value}
+                    deserialized_value = ui_value
                 else:
-                    data = json.loads(ui_value)
+                    deserialized_value = json.loads(ui_value)
             else:
-                data = {}
+                deserialized_value = None
         except Exception:
-            data = {}
+            # TODO: Should we raise an error here? Should we let the user know?
+            deserialized_value = None
 
-        # Return the mapping directly – Streamlit core now handles event keys
-        # generically, so there is no need for the nested "value" indirection
-        # nor for the bespoke BidiComponentWidgetState container.
-        return cast("BidiComponentState", AttributeDictionary(data))
+        state: BidiComponentState = {"value": deserialized_value}
+        return cast("BidiComponentState", AttributeDictionary(state))
 
     def serialize(self, value: Any) -> str:
-        """Serialize *value* for transport to the frontend."""
+        """Serialize the value to be sent to the frontend.
+
+        Args:
+            value: The value to serialize.
+
+        Returns
+        -------
+            A JSON string representation of the value.
+        """
+        # Frontend might expect a specific format; adjust as needed.
+        # Defaulting to JSON serialization.
         return json.dumps(value)
 
 
@@ -177,13 +201,15 @@ class BidiComponentMixin:
     def bidi_component(
         self,
         component_name: str,
+        *args: Any,
         key: str | None = None,
         default: Any = None,
+        on_change: WidgetCallback | None = None,
         child_container_count: int = 0,
         # TODO: This needs to have a better type + support Arrow
         data: Any | None = None,
-        **on_callbacks: WidgetCallback,
-    ) -> BidiComponentResult:
+        **kwargs: Any,
+    ) -> BidiComponentState:
         """Add a bidirectional component instance to the app using a registered component.
 
         Parameters
@@ -191,6 +217,8 @@ class BidiComponentMixin:
         component_name : str
             The name of the registered component to use. The component's HTML, CSS,
             and JS will be loaded from the registry.
+        *args
+            Positional arguments to pass to the component.
         key : str or None
             An optional string to use as the unique key for the component.
             If this is omitted, a key will be generated based on the
@@ -198,19 +226,18 @@ class BidiComponentMixin:
         default: any or None
             The default return value for the component. This is returned when
             the component's frontend hasn't yet specified a value.
+        on_change: WidgetCallback or None
+            An optional callback invoked when the component's value changes.
         child_container_count : int
             The number of child containers this component has. Default is 0.
-        data : Any or None
-            Data to pass to the component (JSON-serializable).
-        **on_callbacks : WidgetCallback
-            Callback functions for handling component events. Use pattern
-            on_{state_name}_change (e.g., on_click_change, on_value_change).
+        **kwargs
+            Keyword arguments to pass to the component.
 
         Returns
         -------
-        BidiComponentResult
-            A result object containing both a DeltaGenerator and the component's state,
-            supporting both .property and ["dictionary"] access patterns for the state values.
+        BidiComponentState
+            A dictionary-like object representing the component's state,
+            supporting attribute and key-based access for the 'value' field.
 
         Raises
         ------
@@ -226,9 +253,8 @@ class BidiComponentMixin:
 
         if ctx is None:
             # Create an empty state with the default value and return it
-            state_values = {"value": default}
-            # Create a mock DeltaGenerator for non-context scenarios
-            return BidiComponentResult(self.dg, state_values)
+            state: BidiComponentState = {"value": default}
+            return cast("BidiComponentState", AttributeDictionary(state))
 
         # Get the component definition from the registry
         from streamlit.runtime import Runtime
@@ -257,20 +283,17 @@ class BidiComponentMixin:
             form_id=current_form_id(self.dg),
         )
 
-        # Parse callbacks using the new on_{state_name}_change pattern
         handlers: dict[str, WidgetCallback] = {}
-        for callback_key, callback_value in on_callbacks.items():
-            if (
-                callback_key.startswith("on_")
-                and callback_key.endswith("_change")
-                and callable(callback_value)
-            ):
-                # Extract event name: on_foo_change -> foo
-                event_name = callback_key[
-                    3:-7
-                ]  # Remove "on_" prefix and "_change" suffix
-                if event_name:  # Ensure we have a valid event name
-                    handlers[event_name] = callback_value
+        if callable(on_change):
+            handlers["change"] = on_change
+
+        # Example for other handlers like on_click from kwargs
+        # We can make this more robust or configurable if needed.
+        for kwarg_key, kwarg_value in kwargs.items():
+            if kwarg_key.startswith("on_") and callable(kwarg_value):
+                event_name = kwarg_key[3:]  # remove "on_"
+                if event_name:  # Ensure we have an event name
+                    handlers[event_name] = kwarg_value
 
         # Set up the component proto
         bidi_component_proto = BidiComponentProto()
@@ -292,8 +315,6 @@ class BidiComponentMixin:
         # Instantiate the Serde for this component instance
         serde = BidiComponentSerde()
 
-        # Use the generic widget registration – multi-event callbacks are now
-        # handled centrally in SessionState.
         component_state = register_widget(
             bidi_component_proto.id,
             deserializer=serde.deserialize,
@@ -306,14 +327,7 @@ class BidiComponentMixin:
         # Enqueue using the dg instance
         self.dg._enqueue(INTERNAL_COMPONENT_NAME, bidi_component_proto)
 
-        # Extract state values from the component state (it is already a mapping
-        # produced by the deserializer above).
-        state_dict: dict[str, Any] = {}
-        if isinstance(component_state.value, dict):
-            state_dict = component_state.value  # type: ignore[assignment]
-
-        # Return BidiComponentResult with delta generator and state values
-        return BidiComponentResult(self.dg, state_dict)
+        return cast("BidiComponentState", component_state.value)
 
     @property
     def dg(self) -> DeltaGenerator:
