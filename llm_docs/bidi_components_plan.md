@@ -63,9 +63,9 @@ Below is the recommended dev sequence – each checkbox can be shipped as an inc
   - _TDD_: `lib/tests/streamlit/components/test_bidi_id_builder.py` → covers happy-path, illegal chars, and idempotency.
 - [x] **Frontend ID builder**: Mirror the helper in TS and update `BidiComponent.tsx` handler factory so that every call to `setTriggerValue` uses the suffixed ID.
   - _TDD_: `frontend/lib/src/components/widgets/BidiComponent/idBuilder.test.ts` → validates parity with Python logic via a set of (base,event) fixtures.
-- [ ] **WidgetStateManager.update()**: Overload `setTriggerValue` to accept an _optional_ `value` argument that maps into the new `json_trigger_value` protobuf field.
+- [x] **WidgetStateManager.update()**: Overload `setTriggerValue` to accept an _optional_ `value` argument that maps into the new `json_trigger_value` protobuf field.
 - _TDD_: `frontend/lib/src/components/widgets/WidgetStateManager/setTriggerValue.test.ts` → ensures the protobuf field is populated and that legacy (no-value) calls still work.
-- [ ] **SessionState reset hook**: Extend `_reset_triggers` with the `json_trigger_value` clause while keeping existing behaviour untouched.
+- [x] **SessionState reset hook**: Extend `_reset_triggers` with the `json_trigger_value` clause while keeping existing behaviour untouched.
   - _TDD_: `lib/tests/streamlit/session_state/test_reset_triggers.py` → simulates a run cycle and asserts the value resets to `None`.
 
 ---

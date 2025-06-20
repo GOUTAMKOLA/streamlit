@@ -118,15 +118,13 @@ export default function(component) {
       text: event.target.text.value,
     }
     console.log("Form submitted with values", formValues)
-    setStateValue("value", formValues)
+    setStateValue("formValues", formValues)
   }
-
   form.addEventListener("submit", handleSubmit)
 
   const handleClick = () => {
     setTriggerValue("clicked", true)
   }
-
   parentElement.addEventListener("click", handleClick, { capture: true })
 
   return () => {

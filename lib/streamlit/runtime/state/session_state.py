@@ -136,9 +136,7 @@ class WStates(MutableMapping[str, Any]):
             )
         )
 
-        # Store the deserialized value back into the state mapping.
         self.states[k] = Value(deserialized)
-
         return deserialized
 
     def __setitem__(self, k: str, v: WState) -> None:
@@ -389,25 +387,15 @@ class SessionState:
         _old_state dict, and then clear our current session_state and
         widget_state.
         """
-        # Preserve widget metadata so that callbacks can be executed *before*
-        # widgets are re-registered in the next script run. Without this, the
-        # metadata (including callback references) would be lost, preventing
-        # us from detecting and invoking the appropriate callbacks.
-        preserved_metadata = self._new_widget_state.widget_metadata.copy()
-
         for key_or_wid in self:
             try:
                 self._old_state[key_or_wid] = self[key_or_wid]
             except KeyError:  # noqa: PERF203
-                # Handle key errors from widget state not having metadata gracefully
+                # handle key errors from widget state not having metadata gracefully
                 # https://github.com/streamlit/streamlit/issues/7206
                 pass
-
         self._new_session_state.clear()
         self._new_widget_state.clear()
-
-        # Restore the preserved metadata after clearing the widget state.
-        self._new_widget_state.widget_metadata = preserved_metadata
 
     def clear(self) -> None:
         """Reset self completely, clearing all current and old values."""
@@ -587,119 +575,75 @@ class SessionState:
         self._call_callbacks()
 
     def _call_callbacks(self) -> None:
-        """Invoke all widget callbacks based on value or trigger changes.
-
-        The logic is now generic:
-        • Widgets may register an arbitrary mapping ``callbacks`` whose keys are
-          event names (e.g. "change", "click", "row_select").
-        • For every widget we compare the *per-event* value from the current
-          run against the previous run.  A callback fires when:
-
-            – The event is "click"  ➜ the new event value is truthy.
-            – Any other event       ➜ ``new != old``.
-        • The event value is extracted via :py:meth:`_extract_event_value`.
+        """Call any callback associated with each widget whose value
+        changed between the previous and current script runs, or whose
+        trigger_value is set.
         """
-
         from streamlit.runtime.scriptrunner import RerunException
 
-        _MISSING = object()
+        # Iterate over a copy of keys in case callbacks modify underlying collections.
+        widget_ids_to_process = list(self._new_widget_state.states.keys())
 
-        # ------------------------------------------------------------------
-        # Helper to execute a callback with fragment-context awareness
-        # ------------------------------------------------------------------
-        def _execute_callback(
-            fn: Callable[..., None],
-            meta: WidgetMetadata[Any],
-            cb_args: tuple[Any, ...],
-            cb_kwargs: dict[str, Any],
-        ) -> None:
-            ctx = get_script_run_ctx()
-            if ctx and meta.fragment_id is not None:
-                ctx.in_fragment_callback = True
-                fn(*cb_args, **cb_kwargs)
-                ctx.in_fragment_callback = False
-            else:
-                fn(*cb_args, **cb_kwargs)
-
-        # ------------------------------------------------------------------
-        # Walk every widget that has at least one callback
-        # ------------------------------------------------------------------
-        for wid, meta in list(self._new_widget_state.widget_metadata.items()):
-            if not meta.callbacks:
+        for wid in widget_ids_to_process:
+            metadata = self._new_widget_state.widget_metadata.get(wid)
+            if not metadata or not metadata.callbacks:
                 continue
 
-            try:
-                new_val = self._new_widget_state[wid]
-            except KeyError:
-                continue  # Widget vanished mid-run?
+            args = metadata.callback_args or ()
+            kwargs = metadata.callback_kwargs or {}
 
-            old_val = self._old_state.get(wid, _MISSING)
+            # Helper to execute a callback with fragment context handling
+            def execute_callback(
+                callback_fn: Callable,
+                metadata: WidgetMetadata[Any],
+                metadata_args: tuple[Any, ...],
+                metadata_kwargs: dict[str, Any],
+            ):
+                ctx = get_script_run_ctx()
+                if ctx and metadata.fragment_id is not None:
+                    ctx.in_fragment_callback = True
+                    callback_fn(*metadata_args, **metadata_kwargs)
+                    ctx.in_fragment_callback = False
+                else:
+                    callback_fn(*metadata_args, **metadata_kwargs)
 
-            for event_name, cb_fn in meta.callbacks.items():
-                try:
-                    evt_new = self._extract_event_value(new_val, event_name)
-                    evt_old = self._extract_event_value(old_val, event_name)
+            # 1. Check for trigger-based callbacks (e.g., "click")
+            #    This requires getting the serialized protobuf state.
+            widget_proto_state = self._new_widget_state.get_serialized(wid)
+            if widget_proto_state and widget_proto_state.trigger_value:
+                click_callback = metadata.callbacks.get("click")
+                if click_callback:
+                    try:
+                        execute_callback(click_callback, metadata, args, kwargs)
+                    except RerunException:
+                        st.warning("Calling st.rerun() within a callback is a no-op.")
 
-                    fired = False
-                    if event_name == "click":
-                        fired = bool(evt_new)
-                    else:
-                        fired = evt_new != evt_old
+            # 2. Check for value-changed based callbacks (e.g., "change")
+            #    _widget_changed compares the primary deserialized value against _old_state.
+            if self._widget_changed(wid):
+                change_callback = metadata.callbacks.get("change")
+                if change_callback:
+                    try:
+                        # Ensure we don't call the same callback instance twice if it was already
+                        # triggered by trigger_value (e.g. if "click" and "change" are the same function).
+                        # This check is subtle: if trigger_value was true AND _widget_changed is true,
+                        # and both 'click' and 'change' map to the same callback object,
+                        # it would have already been called by the block above.
+                        # If they map to *different* functions, both will be called if their
+                        # respective conditions (trigger_value set, primary value changed) are met.
 
-                    if fired:
-                        # Back-compat: honour the original args/kwargs for the
-                        # two legacy events when they were traditionally the
-                        # only ones available.
-                        if event_name in {"change", "click"} and (
-                            meta.callback_args or meta.callback_kwargs
-                        ):
-                            _execute_callback(
-                                cb_fn,
-                                meta,
-                                meta.callback_args or (),
-                                meta.callback_kwargs or {},
-                            )
-                        else:
-                            _execute_callback(cb_fn, meta, (evt_new,), {})
-                except RerunException:
-                    st.warning("Calling st.rerun() within a callback is a no-op.")
+                        # A simple way to avoid double execution for the *same callback instance*:
+                        # If 'click' callback exists, was triggered, and is the same as 'change' callback.
+                        was_click_triggered_for_same_fn = (
+                            widget_proto_state
+                            and widget_proto_state.trigger_value
+                            and metadata.callbacks.get("click") == change_callback
+                        )
 
-    # ------------------------------------------------------------------
-    # Helper utilities for the generic callback runner
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    def _extract_event_value(value: Any, event: str) -> Any:
-        """Return the sub-value that corresponds to *event*.
-
-        Rules
-        -----
-        1.  If *value* is the special sentinel ``_MISSING`` return ``None``.
-        2.  Mapping (dict / AttributeDictionary) ➜ ``value.get(event)``.
-        3.  Scalar ➜
-            • event == "change" ➜ the scalar itself.
-            • otherwise         ➜ ``None`` (no per-event value).
-        4.  Fallback – try attribute access.
-        """
-
-        # Sentinel propagated by caller means "no previous value".
-        if value is None or value is ...:  # type: ignore[comparison-overlap]
-            return None
-
-        # Many widgets return an AttributeDictionary (subclass of dict).
-        if isinstance(value, dict):
-            return value.get(event)
-
-        # Scalars (int/str/float/bool) – treat them as the value for the
-        # implicit "change" event.
-        if event == "change":
-            return value
-
-        # Last-ditch: attribute access (rare).
-        try:
-            return getattr(value, event)
-        except Exception:
-            return None
+                        if not was_click_triggered_for_same_fn:
+                            execute_callback(change_callback, metadata, args, kwargs)
+                    except RerunException:
+                        st.warning("Calling st.rerun() within a callback is a no-op.")
 
     def _widget_changed(self, widget_id: str) -> bool:
         """True if the given widget's value changed between the previous
@@ -725,83 +669,30 @@ class SessionState:
         self._remove_stale_widgets(widget_ids_this_run)
 
     def _reset_triggers(self) -> None:
-        """Reset all trigger-style values after a script run.
-
-        Behaviour
-        ---------
-        1. **Proto-based triggers** (classic Button, FileUploader, ChatInput):
-            • `trigger_value`      ➜ `False`
-            • `string_trigger_value`, `chat_input_value` ➜ `None`
-
-        2. **Mapping-based widgets** that return a `dict` / `AttributeDictionary`
-           with per-event keys:
-            • For every *event* that has a registered callback **and is not** the
-              conventional "change" event, we replace the value with ``None``.
-            • This applies to both current-run (`_new_widget_state`) and cached
-              (`_old_state`) containers so that subsequent runs start fresh.
-        """
-
-        # --------------------------------------------------------------
-        # 1. Proto-based triggers (legacy widgets)
-        # --------------------------------------------------------------
-        def _reset_scalar_trigger_container(container):
-            for state_id in list(container):
-                metadata = self._new_widget_state.widget_metadata.get(state_id)
-                if metadata is None:
-                    continue
-
+        """Set all trigger values in our state dictionary to False."""
+        for state_id in self._new_widget_state:
+            metadata = self._new_widget_state.widget_metadata.get(state_id)
+            if metadata is not None:
                 if metadata.value_type == "trigger_value":
-                    container[state_id] = (
-                        Value(False) if isinstance(container, WStates) else False
-                    )  # type: ignore[arg-type]
+                    self._new_widget_state[state_id] = Value(False)
                 elif metadata.value_type in {
                     "string_trigger_value",
                     "chat_input_value",
+                    "json_trigger_value",
                 }:
-                    container[state_id] = (
-                        Value(None) if isinstance(container, WStates) else None
-                    )  # type: ignore[arg-type]
+                    self._new_widget_state[state_id] = Value(None)
 
-        _reset_scalar_trigger_container(self._new_widget_state)
-        _reset_scalar_trigger_container(self._old_state)
-
-        # --------------------------------------------------------------
-        # 2. Mapping-based widgets (multi-event, incl. bidi_component)
-        # --------------------------------------------------------------
-        def _reset_mapping_triggers(container, is_new_state: bool) -> None:
-            # container: either self._new_widget_state.states (dict[str, WState]) or self._old_state
-            items = (
-                container.states.items()
-                if isinstance(container, WStates)
-                else container.items()
-            )
-
-            for wid, raw_val in list(items):
-                metadata = self._new_widget_state.widget_metadata.get(wid)
-                if not metadata or not metadata.callbacks:
-                    continue
-
-                # Obtain the actual user-visible value (dict/AttrDict)
-                if isinstance(container, WStates):
-                    if not isinstance(raw_val, Value):
-                        continue  # ignore serialized entries
-                    val = raw_val.value
-                else:
-                    val = raw_val
-
-                if not isinstance(val, dict):
-                    continue
-
-                # For each event (excluding "change") that had a callback,
-                # set to None.
-                for evt in metadata.callbacks.keys():
-                    if evt == "change":
-                        continue
-                    if val.get(evt) is not None:
-                        val[evt] = None
-
-        _reset_mapping_triggers(self._new_widget_state, True)
-        _reset_mapping_triggers(self._old_state, False)
+        for state_id in self._old_state:
+            metadata = self._new_widget_state.widget_metadata.get(state_id)
+            if metadata is not None:
+                if metadata.value_type == "trigger_value":
+                    self._old_state[state_id] = False
+                elif metadata.value_type in {
+                    "string_trigger_value",
+                    "chat_input_value",
+                    "json_trigger_value",
+                }:
+                    self._old_state[state_id] = None
 
     def _remove_stale_widgets(self, active_widget_ids: set[str]) -> None:
         """Remove widget state for widgets whose ids aren't in `active_widget_ids`."""

@@ -14,25 +14,15 @@
  * limitations under the License.
  */
 
-type CapitalizedString<S extends string> = Capitalize<S>
-export type OnHandlerKey = `on${CapitalizedString<string>}`
-
-export type OnHandlers<Value = unknown> = {
-  [Key in OnHandlerKey]?: (value: Value) => void
-}
-
 // TODO: Expose this so that component authors can use it.
-export type StBidiComponentV2Args<
-  DataShape = unknown,
-  Value = unknown,
-> = OnHandlers<Value> & {
+export type StBidiComponentV2Args<DataShape = unknown, Value = unknown> = {
+  childContainerIDs: string[]
   data: DataShape
   name: string
   parentElement: HTMLElement | ShadowRoot
+  setStateValue: (name: string, value: Value) => void
+  setTriggerValue: (name: string, value: Value) => void
   stKey: string
-  // New functions for state/trigger value management
-  setStateValue<T>(eventType: string, value: T): void
-  setTriggerValue<T>(eventType: string, value: T): void
 }
 
 export type ComponentResult = {

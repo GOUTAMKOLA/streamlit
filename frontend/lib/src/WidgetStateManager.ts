@@ -319,15 +319,36 @@ export class WidgetStateManager {
   }
 
   /**
-   * Sets the trigger value for the given widget ID to true, sends a rerunScript message
-   * to the server, and then immediately unsets the trigger value.
+   * 1. Boolean trigger
+   *    setTriggerValue(widgetInfo, { fromUi: true }, fragmentId)
+   *
+   * 2. Payload (JSON-encoded) trigger
+   *    setTriggerValue(widgetInfo, { fromUi: true }, fragmentId, payload)
+   *
+   *    `payload` can be any JSON-serialisable value. It will be stringified and
+   *    stored in the protobuf `json_trigger_value` field on the backend. If
+   *    `payload` is omitted (or `undefined`) the method falls back to the
+   *    boolean `trigger_value=true` behaviour.
    */
-  public setTriggerValue(
+
+  public setTriggerValue<T>(
     widget: WidgetInfo,
     source: Source,
-    fragmentId: string | undefined
+    fragmentId: string | undefined,
+    value?: T
   ): Promise<void> {
-    this.createWidgetState(widget, source).triggerValue = true
+    const widgetState = this.createWidgetState(widget, source)
+
+    if (value === undefined) {
+      // Simple boolean trigger.
+      widgetState.triggerValue = true
+    } else {
+      // Bidi Component v2: arbitrary payload transported via
+      // json_trigger_value.
+      widgetState.jsonTriggerValue =
+        typeof value === "string" ? value : JSON.stringify(value)
+    }
+
     return this.setTriggerValueAtEndOfEventLoop(widget, source, fragmentId)
   }
 

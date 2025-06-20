@@ -34,6 +34,7 @@ import ErrorElement from "~lib/components/shared/ErrorElement"
 import { useRequiredContext } from "~lib/hooks/useRequiredContext"
 import { LibContext } from "~lib/components/core/LibContext"
 
+import { makeTriggerId } from "./idBuilder"
 import {
   BidiComponentContext,
   BidiComponentContextShape,
@@ -97,37 +98,35 @@ const loadAndRunModule = async ({
     throw new Error("JS module does not have a default export function.")
   }
 
-  // Create setStateValue and setTriggerValue functions for the new API
-  const setStateValue = <T = unknown,>(eventType: string, value: T): void => {
-    LOG.debug(
-      `BidiComponent: setStateValue called with eventType ${eventType} and value`,
-      value
-    )
+  const setStateValue = <T,>(name: string, value: T): void => {
+    let existingValue: T
+    let newValue: T
 
-    void widgetMgr.setBidiComponentStateValue(
+    try {
+      // @ts-expect-error -- TODO: Fix this. We want to ensure that Value is of type object
+      existingValue = data?.[name]
+      newValue = { ...existingValue, [name]: value }
+    } catch (error) {
+      LOG.error(`Failed to get existing value for ${name}`, error)
+      // @ts-expect-error -- TODO: Fix this
+      newValue = { [name]: value }
+    }
+
+    void widgetMgr.setJsonValue(
       { id: componentIdForWidgetMgr },
-      eventType,
-      value,
+      newValue,
       { fromUi: true },
       fragmentId
     )
   }
 
-  const setTriggerValue = <T = unknown,>(
-    eventType: string,
-    value: T
-  ): void => {
-    LOG.debug(
-      `BidiComponent: setTriggerValue called with eventType ${eventType} and value`,
-      value
-    )
-
-    void widgetMgr.setBidiComponentTriggerValue(
-      { id: componentIdForWidgetMgr },
-      eventType,
-      value,
+  const setTriggerValue = (name: string, value: unknown): void => {
+    const triggerId = makeTriggerId(componentIdForWidgetMgr, name)
+    void widgetMgr.setTriggerValue(
+      { id: triggerId },
       { fromUi: true },
-      fragmentId
+      fragmentId,
+      value
     )
   }
 
@@ -138,7 +137,8 @@ const loadAndRunModule = async ({
     // that it is a reserved prop.
     stKey: componentId,
     parentElement,
-    // New API functions for state/trigger value management
+    // TODO: FIXME:
+    childContainerIDs: [],
     setStateValue,
     setTriggerValue,
   } satisfies StBidiComponentV2Args)
