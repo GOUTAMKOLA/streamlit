@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, TypedDict, cast
+from typing import TYPE_CHECKING, Any, Final, TypedDict, cast
 
 from streamlit.elements.lib.form_utils import current_form_id
 from streamlit.elements.lib.policies import check_cache_replay_rules
@@ -37,6 +37,51 @@ if TYPE_CHECKING:
 
 
 INTERNAL_COMPONENT_NAME = "bidi_component"
+
+# Shared constant that delimits the base widget id from the event suffix.
+# This value **must** stay in sync with its TypeScript counterpart defined in
+# `frontend/lib/src/components/widgets/BidiComponent/constants.ts`.
+EVENT_DELIM: Final[str] = "__"
+
+
+def make_trigger_id(base: str, event: str) -> str:
+    """Construct the per-event *trigger widget* identifier.
+
+    The widget id for a trigger is derived from the *base* component id plus
+    an *event* name. We join those two parts with :pydata:`EVENT_DELIM` and
+    perform a couple of validations so that downstream logic can always split
+    the identifier unambiguously.
+
+    Parameters
+    ----------
+    base : str
+        The unique, framework-assigned id of the component instance.
+    event : str
+        The event name as provided by either the frontend or the developer
+        (e.g. "click", "change").
+
+    Returns
+    -------
+    str
+        The composite widget id in the form ``"{base}__{event}"`` where
+        ``__`` is the delimiter.
+
+    Raises
+    ------
+    ValueError
+        If either *base* or *event* already contains the delimiter sequence.
+    """
+
+    if EVENT_DELIM in base:
+        raise StreamlitAPIException(
+            "Base component id must not contain the delimiter sequence"
+        )
+    if EVENT_DELIM in event:
+        raise StreamlitAPIException(
+            "Event name must not contain the delimiter sequence"
+        )
+
+    return f"{base}{EVENT_DELIM}{event}"
 
 
 class BidiComponentState(TypedDict, total=False):

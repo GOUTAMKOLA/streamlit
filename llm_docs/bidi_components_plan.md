@@ -55,18 +55,18 @@ This lets us:
 
 Below is the recommended dev sequence – each checkbox can be shipped as an incremental PR:
 
-- [ ] **Shared constant**: Introduce `EVENT_DELIM = "__"` in both the Python (`lib/streamlit/components/v2/bidi_component.py`) and TS (`frontend/lib/src/components/widgets/BidiComponent/constants.ts`) layers to avoid magic strings.
-  - _Tests first_:
+- [x] **Shared constant**: Introduce `EVENT_DELIM = "__"` in both the Python (`lib/streamlit/components/v2/bidi_component.py`) and TS (`frontend/lib/src/components/widgets/BidiComponent/constants.ts`) layers to avoid magic strings.
+  - _TDD_:
     - `lib/tests/streamlit/components/test_bidi_constants.py` → asserts that `EVENT_DELIM` exists and equals `"__"`.
     - `frontend/lib/src/components/widgets/BidiComponent/__tests__/constants.test.ts` → same assertion on the TS constant export.
-- [ ] **Backend ID builder**: Add helper `def make_trigger_id(base: str, event: str) -> str` and refactor `BidiComponentMixin` to use it.
-  - _Tests first_: `lib/tests/streamlit/components/test_bidi_id_builder.py` → covers happy-path, illegal chars, and idempotency.
-- [ ] **Frontend ID builder**: Mirror the helper in TS and update `BidiComponent.tsx` handler factory so that every call to `setTriggerValue` uses the suffixed ID.
-  - _Tests first_: `frontend/lib/src/components/widgets/BidiComponent/__tests__/idBuilder.test.ts` → validates parity with Python logic via a set of (base,event) fixtures.
+- [x] **Backend ID builder**: Add helper `def make_trigger_id(base: str, event: str) -> str` and refactor `BidiComponentMixin` to use it.
+  - _TDD_: `lib/tests/streamlit/components/test_bidi_id_builder.py` → covers happy-path, illegal chars, and idempotency.
+- [x] **Frontend ID builder**: Mirror the helper in TS and update `BidiComponent.tsx` handler factory so that every call to `setTriggerValue` uses the suffixed ID.
+  - _TDD_: `frontend/lib/src/components/widgets/BidiComponent/__tests__/idBuilder.test.ts` → validates parity with Python logic via a set of (base,event) fixtures.
 - [ ] **WidgetStateManager.update()**: Overload `setTriggerValue` to accept an _optional_ `value` argument that maps into the new `json_trigger_value` protobuf field.
-  - _Tests first_: `frontend/lib/src/components/widgets/WidgetStateManager/__tests__/setTriggerValue.test.ts` → ensures the protobuf field is populated and that legacy (no-value) calls still work.
+- _TDD_: `frontend/lib/src/components/widgets/WidgetStateManager/__tests__/setTriggerValue.test.ts` → ensures the protobuf field is populated and that legacy (no-value) calls still work.
 - [ ] **SessionState reset hook**: Extend `_reset_triggers` with the `json_trigger_value` clause while keeping existing behaviour untouched.
-  - _Tests first_: `lib/tests/streamlit/session_state/test_reset_triggers.py` → simulates a run cycle and asserts the value resets to `None`.
+  - _TDD_: `lib/tests/streamlit/session_state/test_reset_triggers.py` → simulates a run cycle and asserts the value resets to `None`.
 
 ---
 
@@ -84,7 +84,7 @@ class BidiComponentResult(AttributeDictionary):
         return self["delta_generator"]
 ```
 
-- _Tests first_: `lib/tests/streamlit/components/test_bidi_component_result.py` → verifies that the merged dict exposes both attribute & key access and that the `delta_generator` property returns the same object passed to `__init__`.
+- _TDD_: `lib/tests/streamlit/components/test_bidi_component_result.py` → verifies that the merged dict exposes both attribute & key access and that the `delta_generator` property returns the same object passed to `__init__`.
 
 ### 3.2 `BidiComponentMixin.bidi_component()`
 
@@ -118,7 +118,7 @@ class BidiComponentResult(AttributeDictionary):
    return BidiComponentResult(self.dg, state_meta.value, trigger_vals)
    ```
 
-- _Tests first_: `lib/tests/streamlit/components/test_bidi_component_mixin.py` → covers:
+- _TDD_: `lib/tests/streamlit/components/test_bidi_component_mixin.py` → covers:
   - `on_*_change` parsing into `callbacks_by_event`.
   - Correct generation of `make_trigger_id`-style IDs.
   - Registration of widgets with expected `value_type`.
@@ -128,7 +128,7 @@ class BidiComponentResult(AttributeDictionary):
 
 No big change – it still converts `json_value` to a Python `dict`. JS will be sending `{ "state_updates": {…} }`; here we just return that dict and let the user code consume it.
 
-- _Tests first_: `lib/tests/streamlit/components/test_bidi_component_serde.py` → round-trips example `json_value` payloads and asserts Python dict output.
+- _TDD_: `lib/tests/streamlit/components/test_bidi_component_serde.py` → round-trips example `json_value` payloads and asserts Python dict output.
 
 ### 3.4 `session_state._reset_triggers`
 
@@ -140,7 +140,7 @@ elif metadata.value_type == "json_trigger_value":
     self._old_state[state_id] = None
 ```
 
-- _Tests first_: see `lib/tests/streamlit/session_state/test_reset_triggers.py` (already listed) – ensure reset occurs only for the new value_type and leaves others intact.
+- _TDD_: see `lib/tests/streamlit/session_state/test_reset_triggers.py` (already listed) – ensure reset occurs only for the new value_type and leaves others intact.
 
 ---
 
@@ -154,7 +154,7 @@ string json_trigger_value = 15;
 
 (choosing next available field number). Regenerate protos (`scripts/proto_codegen.sh`).
 
-- _Tests first_: `lib/tests/proto/test_widgetstates_proto.py` → uses the generated Python proto module to construct a `WidgetStates` message, sets `json_trigger_value`, serialises & deserialises, and checks the field survives.
+- _TDD_: `lib/tests/proto/test_widgetstates_proto.py` → uses the generated Python proto module to construct a `WidgetStates` message, sets `json_trigger_value`, serialises & deserialises, and checks the field survives.
 
 ---
 
@@ -175,7 +175,7 @@ void widgetMgr.setTriggerValue(
 
 (Note: we will overload `setTriggerValue` to accept a second `value` that will be stored in the `json_trigger_value` field.) Implementation is a 3-line change in `WidgetStateManager.setTriggerValue`.
 
-- _Tests first_: `frontend/lib/src/components/widgets/BidiComponent/__tests__/triggerPath.test.tsx` → mounts the component, fires a dummy event, and asserts that `widgetMgr.setTriggerValue` is called with the suffixed ID and the JSON-stringified payload.
+- _TDD_: `frontend/lib/src/components/widgets/BidiComponent/__tests__/triggerPath.test.tsx` → mounts the component, fires a dummy event, and asserts that `widgetMgr.setTriggerValue` is called with the suffixed ID and the JSON-stringified payload.
 
 ### 5.2 Optional sugar helpers
 
@@ -188,7 +188,7 @@ setTriggerValue(evt, val);
 
 Already implied by product spec – just forward to logic above.
 
-- _Tests first_: `frontend/lib/src/components/widgets/BidiComponent/__tests__/sugarHelpers.test.ts` → spies on the internal helper and verifies correct delegation, argument order, and defaulting to `true` when `val` is omitted.
+- _TDD_: `frontend/lib/src/components/widgets/BidiComponent/__tests__/sugarHelpers.test.ts` → spies on the internal helper and verifies correct delegation, argument order, and defaulting to `true` when `val` is omitted.
 
 ---
 
@@ -201,7 +201,7 @@ Because each _event_ has its own widget we get **per-event callbacks for free**:
 
 Multiple callbacks on the _same_ event (rare) can still be handled by allowing the user to pass a list or by registering chained functions, but **spec only calls for one callback per event**, so no extra work.
 
-- _Tests first_:
+- _TDD_:
   - Backend → `lib/tests/streamlit/components/test_bidi_multi_callback.py` → simulates two trigger widgets, ensures only their respective callbacks fire, and that order/duplication rules hold.
   - Frontend → `frontend/lib/src/components/widgets/BidiComponent/__tests__/multiCallback.test.ts` → verifies that multiple `setTriggerValue` calls in rapid succession map to distinct widget IDs.
 
