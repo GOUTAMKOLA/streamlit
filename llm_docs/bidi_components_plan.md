@@ -1,488 +1,263 @@
-# Bidi Components v2 Implementation Plan
+# Bidi Components v2 – Streamlined Implementation Plan
 
-## Overview
-
-This document outlines the technical plan for implementing the new Bidi Components v2 API, which introduces significant changes to the callback system and return type structure. The changes focus on providing a more flexible and powerful API for handling bidirectional communication between Python and JavaScript.
-
-## Key API Changes Summary
-
-### Python API Changes
-
-- **Function signature**: Remove `args`/`kwargs`, add `**on_callbacks` pattern
-- **Return type**: New `BidiComponentResult` containing both `DeltaGenerator` and state values
-- **Callback system**: Multiple named callbacks using `on_{state_name}_change` pattern
-
-### Frontend JavaScript API Changes
-
-- **Interface**: Add `setStateValue<T>()` and `setTriggerValue<T>()` functions
-- **Type safety**: Generic types for value preservation
-
-## Technical Deep-Dive
-
-### 1. State Persistence vs Triggers System Design
-
-This is a **new fundamental concept** in Streamlit that requires careful design. Currently, all widget values persist across reruns via session state. We need to introduce a dual-mode system:
-
-#### 1.1 Conceptual Model
-
-- **State Values**: Persist across reruns until explicitly changed (like current widgets)
-- **Trigger Values**: Available for one rerun cycle, then automatically reset to `None`
-
-#### 1.2 Data Structure Design
-
-**Backend Widget State Schema:**
-
-```python
-@dataclass
-class BidiComponentWidgetState:
-    state_values: Dict[str, Any]      # Persistent across runs
-    trigger_values: Dict[str, Any]    # Reset to None each run
-```
-
-**Frontend Communication Schema:**
-
-```typescript
-interface ComponentValueUpdate {
-  type: "state" | "trigger";
-  eventType: string;
-  value: any;
-}
-```
-
-#### 1.3 Trigger Reset Strategy (Simplified)
-
-**Core Principle**: Trigger values are automatically reset to `None` at the start of each script run, leveraging Streamlit's existing widget lifecycle.
-
-**Simple Implementation:**
-
-```python
-@dataclass
-class BidiComponentWidgetState:
-    state_values: Dict[str, Any]      # Persistent across runs
-    trigger_values: Dict[str, Any]    # Reset to None each run
-```
-
-**Implementation Flow:**
-
-1. **Script Run Start**: All trigger values automatically reset to `None`
-2. **During Run**: Frontend can call `setTriggerValue()` to set trigger values
-3. **Component Read**: Returns current state values + current trigger values
-4. **Next Script Run**: Trigger values reset to `None` again (automatic)
-
-**Leveraging Existing Streamlit Lifecycle:**
-
-- No need for complex tracking across script runs
-- No need for cleanup logic or script_run_id tracking
-- Trigger reset happens as part of normal widget state management
-- Aligns with existing Streamlit patterns (similar to button behavior)
-
-#### 1.4 Widget State Management Integration
-
-**Current Streamlit Widget Flow:**
-
-```
-1. Widget created → register_widget() → stores in session_state
-2. User interaction → setJsonValue() → updates session_state
-3. Script rerun → widget re-evaluated → reads from session_state
-```
-
-**New Bidi Component Flow:**
-
-```
-1. Component created → register_bidi_widget() → stores BidiComponentWidgetState
-2. Script run start → reset all trigger_values to None
-3. setStateValue() → updates state_values dict (persistent)
-4. setTriggerValue() → updates trigger_values dict (for current run only)
-5. Component read → returns merged state_values + trigger_values
-6. Next script run → trigger_values reset to None again
-```
-
-#### 1.5 Serialization/Deserialization Changes
-
-**Current BidiComponentSerde in `lib/streamlit/components/v2/bidi_component.py`:**
-
-```python
-def deserialize(self, ui_value: str) -> BidiComponentState:
-    return {"value": json.loads(ui_value)}
-```
-
-**New BidiComponentSerde:**
-
-```python
-def deserialize(self, ui_value: str) -> BidiComponentState:
-    data = json.loads(ui_value)
-    widget_state = get_bidi_widget_state(component_id)
-
-    # Update state values (persistent)
-    if 'state_updates' in data:
-        widget_state.state_values.update(data['state_updates'])
-
-    # Update trigger values (for current run only)
-    if 'trigger_updates' in data:
-        widget_state.trigger_values.update(data['trigger_updates'])
-
-    # Merge state and trigger values for return
-    result_values = widget_state.state_values.copy()
-    result_values.update(widget_state.trigger_values)
-
-    return BidiComponentState(result_values)
-
-def reset_triggers_for_new_run(component_id: str):
-    """Reset all trigger values to None at the start of each script run."""
-    widget_state = get_bidi_widget_state(component_id)
-    widget_state.trigger_values = {k: None for k in widget_state.trigger_values}
-```
-
-#### 1.6 Frontend Implementation Details
-
-**Value Setting Functions in `frontend/lib/src/components/widgets/BidiComponent/BidiComponent.tsx`:**
-
-```typescript
-const setStateValue = <T>(eventType: string, value: T): void => {
-  widgetMgr.setJsonValue(
-    { id: componentId },
-    {
-      state_updates: { [eventType]: value },
-    },
-    { fromUi: true },
-    fragmentId
-  );
-};
-
-const setTriggerValue = <T>(eventType: string, value: T): void => {
-  widgetMgr.setJsonValue(
-    { id: componentId },
-    {
-      trigger_updates: { [eventType]: value },
-    },
-    { fromUi: true },
-    fragmentId
-  );
-};
-```
-
-#### 1.7 Integration with Streamlit Widget Lifecycle
-
-**Trigger Reset Integration Points:**
-
-1. **In `lib/streamlit/runtime/state/session_state.py` - `SessionState.on_script_will_rerun()`**:
-
-   - Leverage existing `_reset_triggers()` method at line 670
-   - Extend it to handle bidi component trigger values
-
-2. **In `lib/streamlit/runtime/scriptrunner/script_runner.py` - `ScriptRunner._run_script()`**:
-   - At line 615, after `self._session_state.on_script_will_rerun()`
-   - Add bidi component trigger reset logic
-
-**Benefits:**
-
-- Leverages existing Streamlit infrastructure
-- No complex cross-run tracking required
-- Automatic cleanup as part of normal lifecycle
-- Consistent with other widget behaviors
-
-### 2. Type Safety System Design
-
-#### 2.1 Current Challenge
-
-`setStateValue` and `setTriggerValue` accept `any` type for values, which reduces type safety.
-
-#### 2.2 Type Safety Strategy
-
-```typescript
-setStateValue<T>(eventType: string, value: T): void
-setTriggerValue<T>(eventType: string, value: T): void
-```
-
-### 3. Enhanced Return Type Design
-
-#### 3.1 BidiComponentResult Requirements
-
-- Must contain both a `DeltaGenerator` and the coalesced component state
-- Support both `.property` and `["dictionary"]` access patterns
-- Handle state values (persistent) vs trigger values (reset to None on rerun)
-
-**Implementation:**
-
-```python
-class BidiComponentResult(AttributeDictionary):
-    """
-    Result object from st.components.v2.component containing both
-    a DeltaGenerator and component state values.
-    """
-
-    def __init__(self, delta_generator: DeltaGenerator, state_values: dict):
-        # Store delta_generator as a special property
-        super().__init__({"delta_generator": delta_generator, **state_values})
-
-    @property
-    def delta_generator(self) -> DeltaGenerator:
-        return self["delta_generator"]
-```
-
-#### 3.2 Return Value Composition
-
-```python
-# Example usage after implementation:
-result = st.components.v2.component(
-    "my_component",
-    data={"initial": "data"},
-    on_click_change=handle_click,
-    on_value_change=handle_value
-)
-
-# Access patterns:
-result.delta_generator.markdown("Additional content")  # Delta generator
-result["click"]  # Dictionary access
-result.value     # Property access
-result.click     # Property access for click events
-```
-
-### 4. Callback System Design
-
-#### 4.1 Enhanced Callback Pattern
-
-- Focus on `on_{state_name}_change` pattern for event handling
-- Callbacks receive the event value directly as their single argument
-- Multiple callbacks per component supported
-
-**Implementation Strategy:**
-
-```python
-def parse_callbacks(**kwargs) -> Dict[str, WidgetCallback]:
-    """Parse on_* keyword arguments into event callbacks."""
-    callbacks = {}
-    for key, value in kwargs.items():
-        if key.startswith("on_") and key.endswith("_change") and callable(value):
-            event_name = key[3:-7]  # Remove "on_" and "_change"
-            callbacks[event_name] = value
-    return callbacks
-```
-
-### 5. Error Handling Strategy
-
-#### 5.1 Minimal Required Error Handling
-
-- Implement basic error propagation and user feedback
-- Focus on functionality first; comprehensive error handling can be enhanced later
-
-**Key Error Scenarios:**
-
-- Invalid event types in callbacks
-- Serialization/deserialization failures
-- Component registration errors
-- Type safety violations
+> This revision removes bespoke data-structures and lifecycle hooks that already exist in Streamlit. The plan below shows how to deliver the new Python/JS callback API **using today's widget & trigger plumbing** with only small, localised changes.
 
 ---
 
-## Implementation Checklist
+## 0 TL;DR
+
+We _will_ touch the codebase – but in the most incremental way possible. The table below sums it up:
+
+| Area                                   | Change                                                                         | # LOC |
+| -------------------------------------- | ------------------------------------------------------------------------------ | ----- |
+| Python `bidi_component.py`             | `BidiComponentResult`, multi-callback parsing, widget-id scheme, Serde tweaks  | ≈ 70  |
+| Python `session_state._reset_triggers` | Add support for the **optional** `json_trigger_value` field                    | ≈ 10  |
+| Protobuf                               | Add `json_trigger_value` (string) field (one line)                             | —     |
+| Front-end `BidiComponent.tsx`          | Build `triggerId = baseId + "__" + event` and send value via `setTriggerValue` | ≈ 20  |
+| Unit + E2E tests                       | Update assertions, add trigger-reset test                                      | —     |
+
+Total footprint < 120 LOC (+ proto). No dual worlds; we keep using the widget engine that already exists.
+
+---
+
+## 1 Conceptual model (product-spec aligned)
+
+- **State values** (persistent) – stored in a base widget (`json_value`).
+- **Trigger values** (one-shot) – stored in _per-event_ widgets that auto-reset; needs to transport arbitrary JSON payloads.
+
+Because current trigger widget types (`trigger_value`, `string_trigger_value`) reset automatically, we simply add **`json_trigger_value`** (string that carries JSON payload) so that any data type is possible. We hook this new type into the tiny `_reset_triggers` `elif` block.
+
+---
+
+## 2 Widget-ID scheme & mapping
+
+```
+<component_id>              →  persistent widget (json_value)
+<component_id>__<event>     →  trigger widget  (json_trigger_value)   # NEW
+```
+
+This lets us:
+
+1. Keep an independent trigger channel per event (so simultaneous triggers are OK).
+2. Reuse existing callback dispatch ‑ we register _each_ trigger widget with its own callback dict `{ "click": user_fn }` or `{ "change": user_fn }`.
+3. Achieve automatic reset (handled after we add the new value_type).
+
+### Technical details
+
+- **Uniqueness & determinism**: The `component_id` originates from the `WidgetStateManager` and is already unique per component instance. Appending `__<event>` is therefore collision-free and **idempotent** – generating the same ID every time we render the same component+event pair.
+- **Delimiter choice**: We use a double underscore (`__`) because the core widget engine already forbids this sequence inside `component_id` itself. This guarantees that a simple `split("__", 1)` cleanly separates the base and event portions on both the Python _and_ TS sides.
+- **Round-trip serialisation**: All IDs remain plain ASCII so they flow unchanged through protobuf and JSON layers. No additional escaping is necessary.
+- **Back-compat**: Existing components (which never generate IDs with the `__` pattern) remain unaffected. The new suffix appears only when a component uses `setTriggerValue` / `setStateValue` with a custom event name.
+- **Concurrency**: Because every event sits in its own widget, two JS events fired in the same millisecond won't stomp on each other – the widget engine queues two distinct `json_trigger_value` updates.
+- **Garbage collection**: When a component is removed from the DOM, the widget engine already prunes its state values. The `__<event>` widgets disappear together with the base widget because the key prefix is identical.
 
-### Phase 1: Backend Foundation
+### Implementation checklist
 
-#### Core Data Structures
+Below is the recommended dev sequence – each checkbox can be shipped as an incremental PR:
 
-- [x] Create `BidiComponentResult` class with AttributeDictionary inheritance in `lib/streamlit/components/v2/bidi_component.py`
-- [x] Create `BidiComponentWidgetState` dataclass for dual-mode state management in `lib/streamlit/components/v2/bidi_component.py`
-- [x] Implement trigger reset mechanism by extending `SessionState._reset_triggers()` in `lib/streamlit/runtime/state/session_state.py`
+- [ ] **Shared constant**: Introduce `EVENT_DELIM = "__"` in both the Python (`lib/streamlit/components/v2/bidi_component.py`) and TS (`frontend/lib/src/components/widgets/BidiComponent/constants.ts`) layers to avoid magic strings.
+  - _Tests first_:
+    - `lib/tests/streamlit/components/test_bidi_constants.py` → asserts that `EVENT_DELIM` exists and equals `"__"`.
+    - `frontend/lib/src/components/widgets/BidiComponent/__tests__/constants.test.ts` → same assertion on the TS constant export.
+- [ ] **Backend ID builder**: Add helper `def make_trigger_id(base: str, event: str) -> str` and refactor `BidiComponentMixin` to use it.
+  - _Tests first_: `lib/tests/streamlit/components/test_bidi_id_builder.py` → covers happy-path, illegal chars, and idempotency.
+- [ ] **Frontend ID builder**: Mirror the helper in TS and update `BidiComponent.tsx` handler factory so that every call to `setTriggerValue` uses the suffixed ID.
+  - _Tests first_: `frontend/lib/src/components/widgets/BidiComponent/__tests__/idBuilder.test.ts` → validates parity with Python logic via a set of (base,event) fixtures.
+- [ ] **WidgetStateManager.update()**: Overload `setTriggerValue` to accept an _optional_ `value` argument that maps into the new `json_trigger_value` protobuf field.
+  - _Tests first_: `frontend/lib/src/components/widgets/WidgetStateManager/__tests__/setTriggerValue.test.ts` → ensures the protobuf field is populated and that legacy (no-value) calls still work.
+- [ ] **SessionState reset hook**: Extend `_reset_triggers` with the `json_trigger_value` clause while keeping existing behaviour untouched.
+  - _Tests first_: `lib/tests/streamlit/session_state/test_reset_triggers.py` → simulates a run cycle and asserts the value resets to `None`.
 
-#### Function Signature Updates
+---
 
-- [x] Update `component()` function signature in `lib/streamlit/components/v2/__init__.py`
-- [x] Implement callback parsing logic for `on_{state_name}_change` pattern in `BidiComponentMixin.bidi_component()`
-- [x] Remove `args`/`kwargs` from public API in `lib/streamlit/components/v2/bidi_component.py`
+## 3 Backend changes
 
-#### Protobuf Changes
+### 3.1 `BidiComponentResult`
 
-- [x] Update `proto/streamlit/proto/BidiComponent.proto` for state vs trigger values (if needed)
+```python
+class BidiComponentResult(AttributeDictionary):
+    def __init__(self, dg: DeltaGenerator, state_vals: dict[str, Any], trigger_vals: dict[str, Any]):
+        super().__init__({ "delta_generator": dg, **state_vals, **trigger_vals })
 
-**Phase 1 Implementation Notes**
+    @property
+    def delta_generator(self) -> "DeltaGenerator":
+        return self["delta_generator"]
+```
 
-**Completed:**
+- _Tests first_: `lib/tests/streamlit/components/test_bidi_component_result.py` → verifies that the merged dict exposes both attribute & key access and that the `delta_generator` property returns the same object passed to `__init__`.
 
-- ✅ `BidiComponentResult` class: Successfully implemented with AttributeDictionary inheritance, supporting both `.property` and `["dictionary"]` access patterns. The class stores the DeltaGenerator as a special property while merging state values.
-- ✅ `BidiComponentWidgetState` dataclass: Implemented with separate `state_values` and `trigger_values` dictionaries to support the dual-mode state management system.
-- ✅ Trigger reset mechanism: Extended `SessionState._reset_triggers()` to include `_reset_bidi_component_triggers()` method that safely resets trigger values to None while leveraging existing Streamlit lifecycle.
+### 3.2 `BidiComponentMixin.bidi_component()`
 
-**Implementation Considerations:**
+1. **Parse callbacks**: for every kwarg that matches the regex `^on_(.+)_change$`, capture the _event name_ (group 1) and function. This supports unlimited arbitrary event names:
+   ```python
+   callbacks_by_event: dict[str, WidgetCallback] = {}
+   for k, v in kwargs.items():
+       if k.startswith("on_") and k.endswith("_change") and callable(v):
+           callbacks_by_event[k[3:-7]] = v          # strip on_/ _change
+   ```
+2. **Register _state_ widget** – one per component (holds a dict of all persistent event values).
+3. **Register _trigger_ widgets** – _one per event_ (even if no callback supplied, so the value shows up in result):
+   ```python
+   for evt, cb in callbacks_by_event.items():
+       trig_id = f"{base_id}__{evt}"
+       register_widget(
+           trig_id,
+           deserializer=lambda s: json.loads(s) if s else None,
+           serializer=lambda v: json.dumps(v),
+           ctx=ctx,
+           callbacks={"change": cb},   # click vs change irrelevant; value change fires rerun
+           value_type="json_trigger_value",
+       )
+   ```
+4. **Result assembly** – collect _all_ current triggers (even those with no callback):
+   ```python
+   trigger_vals = {
+       evt: ctx.session_state.get(f"{base_id}__{evt}")
+       for evt in events_seen_from_js_or_kwargs
+   }
+   return BidiComponentResult(self.dg, state_meta.value, trigger_vals)
+   ```
 
-- Used defensive programming in `_reset_bidi_component_triggers()` to handle cases where widget state doesn't have expected structure
-- Added circular import protection by importing `BidiComponentWidgetState` locally within the reset method
-- The trigger reset integration leverages existing Streamlit infrastructure rather than creating new systems
+- _Tests first_: `lib/tests/streamlit/components/test_bidi_component_mixin.py` → covers:
+  - `on_*_change` parsing into `callbacks_by_event`.
+  - Correct generation of `make_trigger_id`-style IDs.
+  - Registration of widgets with expected `value_type`.
+  - Returned `BidiComponentResult` contains both state & trigger keys.
 
-**Function Signature Updates - Completed:**
+### 3.3 `BidiComponentSerde`
 
-- ✅ Updated `component()` function in `lib/streamlit/components/v2/__init__.py` to use `**on_callbacks: WidgetCallback` pattern instead of `on_change` and `**kwargs`
-- ✅ Implemented callback parsing logic using `on_{state_name}_change` pattern (e.g., `on_click_change`, `on_value_change`)
-- ✅ Removed `*args` and replaced old callback handling in `BidiComponentMixin.bidi_component()`
-- ✅ Added comprehensive docstring with parameter descriptions
-- ✅ Added helper function `parse_callbacks()` for reusable callback parsing logic
+No big change – it still converts `json_value` to a Python `dict`. JS will be sending `{ "state_updates": {…} }`; here we just return that dict and let the user code consume it.
 
-**Protobuf Changes - Completed:**
+- _Tests first_: `lib/tests/streamlit/components/test_bidi_component_serde.py` → round-trips example `json_value` payloads and asserts Python dict output.
 
-- ✅ Added documentation comment to `BidiComponent.proto` indicating future extension for state vs trigger differentiation
-- ✅ Current schema supports the Phase 1 implementation; more extensive changes will be needed in Phase 2 for state/trigger value differentiation
+### 3.4 `session_state._reset_triggers`
 
-**Breaking Changes:**
+Add one `elif` in both loops:
 
-- The callback API now requires `on_{event_name}_change` pattern instead of `on_{event_name}`
-- Updated tests to reflect new callback pattern (e.g., `on_value_change` instead of `on_change`)
+```python
+elif metadata.value_type == "json_trigger_value":
+    self._new_widget_state[state_id] = Value(None)
+    self._old_state[state_id] = None
+```
 
-**Backwards Compatibility:**
+- _Tests first_: see `lib/tests/streamlit/session_state/test_reset_triggers.py` (already listed) – ensure reset occurs only for the new value_type and leaves others intact.
 
-- Function signature changes are breaking but necessary for the new API design
-- All existing tests pass with minimal updates to use new callback patterns
+---
 
-**Implementation Issues Identified:**
+## 4 Protobuf tweak
 
-- ⚠️ **Return Type Change Pending**: The plan calls for changing return type from `BidiComponentState` to `BidiComponentResult`, but this was not implemented in Phase 1 to avoid breaking existing functionality. This change should be addressed in a later phase when the full state management system is implemented.
-- ⚠️ **Phase 2 Dependency**: The new callback parsing logic is in place, but the actual state vs trigger value differentiation requires the Phase 2 state management system implementation.
+In `proto/WidgetStates.proto` add
 
-### Phase 2: State Management System
+```protobuf
+string json_trigger_value = 15;
+```
 
-#### Widget Registration
+(choosing next available field number). Regenerate protos (`scripts/proto_codegen.sh`).
 
-- [x] Create `register_bidi_widget()` function for dual-mode state management in `lib/streamlit/runtime/state/widgets.py`
-- [x] Update `BidiComponentMixin.bidi_component()` in `lib/streamlit/components/v2/bidi_component.py` to handle new callback system
-- [x] Modify return type from `BidiComponentState` to `BidiComponentResult` in `lib/streamlit/components/v2/bidi_component.py`
+- _Tests first_: `lib/tests/proto/test_widgetstates_proto.py` → uses the generated Python proto module to construct a `WidgetStates` message, sets `json_trigger_value`, serialises & deserialises, and checks the field survives.
 
-#### Serialization/Deserialization
+---
 
-- [x] Implement new `BidiComponentSerde` with state/trigger differentiation in `lib/streamlit/components/v2/bidi_component.py`
-- [x] Extend `SessionState._reset_triggers()` method in `lib/streamlit/runtime/state/session_state.py` to handle bidi component triggers
-- [x] Update widget state management to handle multiple callbacks in `lib/streamlit/runtime/state/session_state.py`
+## 5 Frontend changes
 
-#### Memory Management
+### 5.1 `BidiComponent.tsx`
 
-- [x] Implement trigger value cleanup mechanism in `SessionState.on_script_will_rerun()` in `lib/streamlit/runtime/state/session_state.py`
-- [x] Add trigger reset integration in `ScriptRunner._run_script()` in `lib/streamlit/runtime/scriptrunner/script_runner.py`
-- [x] Handle memory cleanup for long-running sessions leveraging existing cleanup in `SessionState.on_script_finished()`
+Inside the existing handler-factory change:
 
-**Phase 2 Implementation Notes - Completed:**
+```ts
+const triggerId = `${componentIdForWidgetMgr}__${eventName}`;
+void widgetMgr.setTriggerValue(
+  { id: triggerId },
+  JSON.stringify(value ?? true) as any, // WidgetStateManager currently ignores this arg; value carried via proto field
+  fragmentId
+);
+```
 
-- ✅ **Widget Registration System**: Successfully implemented specialized `register_bidi_widget()` function and `register_bidi_widget_from_metadata()` in `lib/streamlit/runtime/state/widgets.py`. These functions handle dual-mode state management with BidiComponentWidgetState objects containing both persistent state values and transient trigger values.
+(Note: we will overload `setTriggerValue` to accept a second `value` that will be stored in the `json_trigger_value` field.) Implementation is a 3-line change in `WidgetStateManager.setTriggerValue`.
 
-- ✅ **BidiComponentMixin Updates**: Updated `bidi_component()` method to use new registration system, changed return type from `BidiComponentState` to `BidiComponentResult`, and implemented proper callback parsing with `on_{state_name}_change` pattern. The method now returns a BidiComponentResult object containing both DeltaGenerator and merged state values.
+- _Tests first_: `frontend/lib/src/components/widgets/BidiComponent/__tests__/triggerPath.test.tsx` → mounts the component, fires a dummy event, and asserts that `widgetMgr.setTriggerValue` is called with the suffixed ID and the JSON-stringified payload.
 
-- ✅ **Enhanced BidiComponentSerde**: Completely rewrote the serialization/deserialization logic to handle state/trigger differentiation. The new implementation supports frontend communication format with `state_updates` (persistent) and `trigger_updates` (transient) fields, while maintaining backward compatibility with legacy format.
+### 5.2 Optional sugar helpers
 
-- ✅ **SessionState Integration**: Added `register_bidi_widget()` method to SessionState class that properly initializes and manages BidiComponentWidgetState objects. The method handles merging of state and trigger values for return to components while maintaining separation for internal state management.
+Expose to component authors:
 
-- ✅ **Advanced Callback System**: Completely rewrote `_call_callbacks()` method to handle bidi components with event-specific callbacks. Each callback receives the specific event value as a single argument. Trigger values are called immediately when set, state values are called only when changed compared to previous run. Legacy widget callback handling remains intact for non-bidi components.
+```ts
+setStateValue(evt, val);
+setTriggerValue(evt, val);
+```
 
-- ✅ **Memory Management**: All trigger reset mechanisms leverage existing Streamlit infrastructure. The `_reset_bidi_component_triggers()` method integrates seamlessly with the existing `_reset_triggers()` lifecycle, which is automatically called via `on_script_will_rerun()` in ScriptRunner. No additional ScriptRunner modifications were needed.
+Already implied by product spec – just forward to logic above.
 
-**Key Implementation Features:**
+- _Tests first_: `frontend/lib/src/components/widgets/BidiComponent/__tests__/sugarHelpers.test.ts` → spies on the internal helper and verifies correct delegation, argument order, and defaulting to `true` when `val` is omitted.
 
-1. **Defensive Programming**: All bidi component detection uses safe type checking and exception handling to avoid breaking existing widget functionality.
+---
 
-2. **Circular Import Protection**: Strategic use of local imports within methods to avoid circular dependency issues between components and session state.
+## 6 Multi-callback semantics
 
-3. **Backward Compatibility**: Legacy callback patterns and simple value formats continue to work unchanged.
+Because each _event_ has its own widget we get **per-event callbacks for free**:
 
-4. **Type Safety**: Proper TYPE_CHECKING imports ensure type hints work correctly while avoiding runtime circular imports.
+- For `on_click_change` we attach to trigger widget's `"click"` key.
+- For `on_value_change` (persistent) we attach to state widget's `"change"` key (already in place), but we must tweak `_widget_changed` detection to work with dicts – easy: compare full dicts (already does deep compare).
 
-**Implementation Issues Identified:**
+Multiple callbacks on the _same_ event (rare) can still be handled by allowing the user to pass a list or by registering chained functions, but **spec only calls for one callback per event**, so no extra work.
 
-- ⚠️ **Component ID Dependency**: The new BidiComponentSerde requires component ID to be set via `set_component_id()` method for proper widget state access. This creates a slight coupling between serialization and widget registration that should be monitored.
+- _Tests first_:
+  - Backend → `lib/tests/streamlit/components/test_bidi_multi_callback.py` → simulates two trigger widgets, ensures only their respective callbacks fire, and that order/duplication rules hold.
+  - Frontend → `frontend/lib/src/components/widgets/BidiComponent/__tests__/multiCallback.test.ts` → verifies that multiple `setTriggerValue` calls in rapid succession map to distinct widget IDs.
 
-- ⚠️ **Return Type Evolution**: Successfully changed return type from `BidiComponentState` to `BidiComponentResult`, which is a breaking change but necessary for the new API design. Existing tests will need updates to handle the new return type.
+---
 
-### Phase 3: Frontend Integration
+## 7 Testing
 
-#### TypeScript Interface Updates
+1. **Backend**: add unit tests covering
+   - JSON trigger resets to `None` between runs. (`test_reset_triggers.py`)
+   - Callbacks fire exactly once. (`test_bidi_multi_callback.py`)
+2. **Frontend**: update existing BidiComponent tests to expect suffixed widget ids (`triggerPath.test.tsx`) and verify helper utilities (`sugarHelpers.test.ts`).
+3. **Playwright**: reuse current `trigger_reset_test` after renaming the trigger id expectation.
 
-- [x] Update `StBidiComponentV2Args` interface in `frontend/lib/src/components/widgets/BidiComponent/types.ts`:
-  - Remove `childContainerIDs`
-  - Add `setStateValue<T>` and `setTriggerValue<T>` functions
+---
 
-#### Component Implementation
+## 8 End-to-end spec example
 
-- [x] Update `loadAndRunModule` function in `frontend/lib/src/components/widgets/BidiComponent/BidiComponent.tsx`
-- [x] Implement `setStateValue` and `setTriggerValue` functions with type safety
-- [x] Update handler generation logic to use new callback system
-- [x] Remove hardcoded handler logic (like special `onClick` handling in lines 106-115)
+```python
+out = st.components.v2.component(
+    "my_component",
+    html="<div>Some html</div>",
+    on_my_stateful_value_change=lambda v: st.write("state now", v),
+    on_my_trigger_change=lambda _: st.write("trigger fired"),
+)
+```
 
-#### Context Updates
+Assume the JS side does:
 
-- [x] Update `BidiComponentContext` shape if needed for new callback system in `frontend/lib/src/components/widgets/BidiComponent/BidiComponentContext.tsx`
-- [x] Ensure proper widget state manager integration
+```js
+setStateValue("my_stateful_value", "hello");
+setTriggerValue("my_trigger");
+```
 
-#### Widget State Manager Integration
+Return value **during the rerun invoked by setTriggerValue**:
 
-- [x] Support differentiation between state values and trigger values in `frontend/lib/src/WidgetStateManager.ts`
-- [x] Implement trigger value reset logic on reruns
-- [x] Handle multiple callback types per component
+```python
+{
+  "delta_generator": <DeltaGenerator>,
+  "my_stateful_value": "hello",   # persistent
+  "my_trigger": True               # trigger fired
+}
+```
 
-**Phase 3 Implementation Notes - Completed:**
+Return value **on a subsequent unrelated rerun**:
 
-- ✅ **TypeScript Interface Updates**: Successfully updated `StBidiComponentV2Args` interface to remove `childContainerIDs` and add `setStateValue<T>` and `setTriggerValue<T>` functions with proper generic typing. The interface now provides the new API functions directly to component authors.
+```python
+{
+  "delta_generator": <DeltaGenerator>,
+  "my_stateful_value": "hello",
+  "my_trigger": None   # auto-reset by SessionState._reset_triggers
+}
+```
 
-- ✅ **WidgetStateManager Integration**: Added `setBidiComponentStateValue()` and `setBidiComponentTriggerValue()` methods to the WidgetStateManager. These methods format data according to the backend's expected schema:
+Callbacks:
 
-  - State values: `{ state_updates: { eventType: value } }`
-  - Trigger values: `{ trigger_updates: { eventType: value } }`
+- `on_my_stateful_value_change` called whenever the _value_ differs from previous run.
+- `on_my_trigger_change` called exactly when `my_trigger` widget's `json_trigger_value` is set (same run where `True` is observed).
 
-- ✅ **Component Implementation**: Completely rewrote the `loadAndRunModule` function in `BidiComponent.tsx`:
-
-  - Added `setStateValue<T = unknown,>()` and `setTriggerValue<T = unknown,>()` functions with type safety
-  - Removed hardcoded `onClick` special handling that used `setTriggerValue` directly
-  - Maintained backward compatibility by keeping legacy handler generation (`onXxx` pattern)
-  - Updated component interface to pass new API functions to component modules
-
-- ✅ **Context Integration**: Verified that `BidiComponentContext` already provides necessary information (`registeredHandlerNames`, `widgetMgr`, etc.) and requires no changes for the new callback system.
-
-**Key Implementation Features:**
-
-1. **Backward Compatibility**: Legacy `onXxx` handlers continue to work using `setJsonValue()` for existing components.
-
-2. **Type Safety**: Generic functions `setStateValue<T>()` and `setTriggerValue<T>()` preserve type information at compile time.
-
-3. **Protocol Compliance**: Frontend sends data in the exact format expected by the backend's new `BidiComponentSerde` implementation.
-
-4. **Error Handling**: Added comprehensive logging for debugging state/trigger value operations.
-
-**Implementation Issues Identified:**
-
-- ⚠️ **TypeScript Generic Syntax**: Had to use `<T = unknown,>` syntax instead of `<T>` to avoid JSX parsing conflicts in `.tsx` files.
-
-- ⚠️ **API Transition**: Components must be updated to use the new `setStateValue()` and `setTriggerValue()` API instead of legacy `onXxx` handlers to benefit from state/trigger differentiation.
-
-### Phase 4: Testing & Documentation
-
-#### Backend Testing
-
-- [ ] Update existing tests in `lib/tests/streamlit/components/v2/`
-- [ ] Add comprehensive tests for new callback system
-- [ ] Add tests for state vs trigger value behavior
-- [ ] Add tests for new return type interface
-- [ ] Test trigger reset mechanism integrated with script lifecycle
-
-#### Frontend Testing
-
-- [ ] Add frontend tests for new JS interface
-- [ ] Test type safety with generic functions
-- [ ] Test state/trigger value differentiation
-- [ ] Add integration tests for callback system
-
-#### Documentation
-
-- [ ] Document API changes clearly
-- [ ] Create migration guide for any existing v2 components (if any)
-- [ ] Update API documentation for new return type and callback patterns
-- [ ] Document type safety features and best practices
-
-## Implementation Notes
-
-### Performance Considerations
-
-- Focus on functionality first; performance optimizations can be addressed later
-- Use existing Streamlit infrastructure (session state lifecycle) rather than creating new systems
-- Memory cleanup for trigger values is important for long-running sessions
-
-### Technical Dependencies
-
-- Leverage existing trigger reset mechanism in `lib/streamlit/runtime/state/session_state.py`
-- Build on existing widget state management system
-- Use existing `AttributeDictionary` for return type implementation
-
-This plan provides a comprehensive roadmap for implementing the Bidi Components v2 API changes while leveraging existing Streamlit infrastructure and maintaining code quality.
+This satisfies every product-spec bullet: multiple dynamic callbacks, unified return object, persistent & trigger semantics, minimal core modifications.
