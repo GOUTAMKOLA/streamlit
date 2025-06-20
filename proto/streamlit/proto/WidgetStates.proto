@@ -58,5 +58,8 @@ message WidgetState {
     // ChatInputValue resets itself to empty after the script has been run.
     // This is used for the chat_input widget.
     ChatInputValue chat_input_value = 15;
+    string json_trigger_value = 16;
+
+    // Next ID: 17
   }
 }

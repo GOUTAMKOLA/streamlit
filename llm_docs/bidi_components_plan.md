@@ -58,13 +58,13 @@ Below is the recommended dev sequence – each checkbox can be shipped as an inc
 - [x] **Shared constant**: Introduce `EVENT_DELIM = "__"` in both the Python (`lib/streamlit/components/v2/bidi_component.py`) and TS (`frontend/lib/src/components/widgets/BidiComponent/constants.ts`) layers to avoid magic strings.
   - _TDD_:
     - `lib/tests/streamlit/components/test_bidi_constants.py` → asserts that `EVENT_DELIM` exists and equals `"__"`.
-    - `frontend/lib/src/components/widgets/BidiComponent/__tests__/constants.test.ts` → same assertion on the TS constant export.
+    - `frontend/lib/src/components/widgets/BidiComponent/constants.test.ts` → same assertion on the TS constant export.
 - [x] **Backend ID builder**: Add helper `def make_trigger_id(base: str, event: str) -> str` and refactor `BidiComponentMixin` to use it.
   - _TDD_: `lib/tests/streamlit/components/test_bidi_id_builder.py` → covers happy-path, illegal chars, and idempotency.
 - [x] **Frontend ID builder**: Mirror the helper in TS and update `BidiComponent.tsx` handler factory so that every call to `setTriggerValue` uses the suffixed ID.
-  - _TDD_: `frontend/lib/src/components/widgets/BidiComponent/__tests__/idBuilder.test.ts` → validates parity with Python logic via a set of (base,event) fixtures.
+  - _TDD_: `frontend/lib/src/components/widgets/BidiComponent/idBuilder.test.ts` → validates parity with Python logic via a set of (base,event) fixtures.
 - [ ] **WidgetStateManager.update()**: Overload `setTriggerValue` to accept an _optional_ `value` argument that maps into the new `json_trigger_value` protobuf field.
-- _TDD_: `frontend/lib/src/components/widgets/WidgetStateManager/__tests__/setTriggerValue.test.ts` → ensures the protobuf field is populated and that legacy (no-value) calls still work.
+- _TDD_: `frontend/lib/src/components/widgets/WidgetStateManager/setTriggerValue.test.ts` → ensures the protobuf field is populated and that legacy (no-value) calls still work.
 - [ ] **SessionState reset hook**: Extend `_reset_triggers` with the `json_trigger_value` clause while keeping existing behaviour untouched.
   - _TDD_: `lib/tests/streamlit/session_state/test_reset_triggers.py` → simulates a run cycle and asserts the value resets to `None`.
 
@@ -175,7 +175,7 @@ void widgetMgr.setTriggerValue(
 
 (Note: we will overload `setTriggerValue` to accept a second `value` that will be stored in the `json_trigger_value` field.) Implementation is a 3-line change in `WidgetStateManager.setTriggerValue`.
 
-- _TDD_: `frontend/lib/src/components/widgets/BidiComponent/__tests__/triggerPath.test.tsx` → mounts the component, fires a dummy event, and asserts that `widgetMgr.setTriggerValue` is called with the suffixed ID and the JSON-stringified payload.
+- _TDD_: `frontend/lib/src/components/widgets/BidiComponent/triggerPath.test.tsx` → mounts the component, fires a dummy event, and asserts that `widgetMgr.setTriggerValue` is called with the suffixed ID and the JSON-stringified payload.
 
 ### 5.2 Optional sugar helpers
 
@@ -188,7 +188,7 @@ setTriggerValue(evt, val);
 
 Already implied by product spec – just forward to logic above.
 
-- _TDD_: `frontend/lib/src/components/widgets/BidiComponent/__tests__/sugarHelpers.test.ts` → spies on the internal helper and verifies correct delegation, argument order, and defaulting to `true` when `val` is omitted.
+- _TDD_: `frontend/lib/src/components/widgets/BidiComponent/sugarHelpers.test.ts` → spies on the internal helper and verifies correct delegation, argument order, and defaulting to `true` when `val` is omitted.
 
 ---
 
@@ -203,7 +203,7 @@ Multiple callbacks on the _same_ event (rare) can still be handled by allowing t
 
 - _TDD_:
   - Backend → `lib/tests/streamlit/components/test_bidi_multi_callback.py` → simulates two trigger widgets, ensures only their respective callbacks fire, and that order/duplication rules hold.
-  - Frontend → `frontend/lib/src/components/widgets/BidiComponent/__tests__/multiCallback.test.ts` → verifies that multiple `setTriggerValue` calls in rapid succession map to distinct widget IDs.
+  - Frontend → `frontend/lib/src/components/widgets/BidiComponent/multiCallback.test.ts` → verifies that multiple `setTriggerValue` calls in rapid succession map to distinct widget IDs.
 
 ---
 
