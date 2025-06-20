@@ -16,7 +16,7 @@
 
 import { createContext } from "react"
 
-import { WidgetStateManager } from "~lib/WidgetStateManager"
+import { WidgetInfo, WidgetStateManager } from "~lib/WidgetStateManager"
 
 export type BidiComponentContextShape = {
   componentName: string
@@ -29,6 +29,7 @@ export type BidiComponentContextShape = {
   jsContent: string | undefined
   jsSourcePath: string | undefined
   widgetMgr: WidgetStateManager
+  widgetInfo: WidgetInfo
 }
 
 export const BidiComponentContext =

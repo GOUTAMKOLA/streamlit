@@ -130,8 +130,10 @@ class BidiComponentResult(AttributeDictionary):
         super().__init__(
             {
                 "delta_generator": dg,
-                **state_vals,
+                # The order here matters, because all stateful values will
+                # always be returned, but trigger values may be transient.
                 **trigger_vals,
+                **state_vals,
             }
         )
 
@@ -379,7 +381,7 @@ class BidiComponentMixin:
         else:
             state_vals = {"value": state_raw}
 
-        return BidiComponentResult(self.dg, state_vals, trigger_vals)
+        return BidiComponentResult(self.dg, state_vals.get("value", {}), trigger_vals)
 
     @property
     def dg(self) -> DeltaGenerator:

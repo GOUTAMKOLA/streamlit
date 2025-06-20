@@ -29,7 +29,7 @@ import { getLogger } from "loglevel"
 
 import type { BidiComponent as BidiComponentProto } from "@streamlit/protobuf"
 
-import type { WidgetStateManager } from "~lib/WidgetStateManager"
+import type { WidgetInfo, WidgetStateManager } from "~lib/WidgetStateManager"
 import ErrorElement from "~lib/components/shared/ErrorElement"
 import { useRequiredContext } from "~lib/hooks/useRequiredContext"
 import { LibContext } from "~lib/components/core/LibContext"
@@ -77,6 +77,7 @@ const loadAndRunModule = async ({
   fragmentId,
   moduleUrl,
   parentElement,
+  widgetInfo,
   widgetMgr,
 }: {
   componentId: string
@@ -86,6 +87,7 @@ const loadAndRunModule = async ({
   fragmentId: string | undefined
   moduleUrl: string
   parentElement: HTMLElement | ShadowRoot
+  widgetInfo: WidgetInfo
   widgetMgr: WidgetStateManager
 }): Promise<ComponentResult> => {
   const module = await import(/* @vite-ignore */ moduleUrl)
@@ -98,13 +100,16 @@ const loadAndRunModule = async ({
     throw new Error("JS module does not have a default export function.")
   }
 
-  const setStateValue = <T,>(name: string, value: T): void => {
-    let existingValue: T
-    let newValue: T
+  const setStateValue = <T extends Record<string, unknown>>(
+    name: string,
+    value: T[keyof T]
+  ): void => {
+    let newValue: T[keyof T]
 
     try {
-      // @ts-expect-error -- TODO: Fix this. We want to ensure that Value is of type object
-      existingValue = data?.[name]
+      const widgetState = widgetMgr.getJsonValue(widgetInfo)
+      const existingValue = widgetState ? JSON.parse(widgetState) : {}
+
       newValue = { ...existingValue, [name]: value }
     } catch (error) {
       LOG.error(`Failed to get existing value for ${name}`, error)
@@ -251,6 +256,7 @@ const useHandleJsContent = ({
     id,
     jsContent,
     jsSourcePath,
+    widgetInfo,
     widgetMgr,
   } = useRequiredContext(BidiComponentContext)
 
@@ -302,6 +308,7 @@ const useHandleJsContent = ({
             componentIdForWidgetMgr: id,
             fragmentId,
             widgetMgr,
+            widgetInfo,
           })
 
           cleanup = result.cleanup
@@ -335,6 +342,7 @@ const useHandleJsContent = ({
               componentIdForWidgetMgr: id,
               fragmentId,
               widgetMgr,
+              widgetInfo,
             })
 
             cleanup = result.cleanup
@@ -381,6 +389,7 @@ const useHandleJsContent = ({
     jsSourcePathUrl,
     setError,
     skip,
+    widgetInfo,
     widgetMgr,
   ])
 }
@@ -493,6 +502,7 @@ const BidiComponent: FC<BidiComponentProps> = ({
       id,
       jsContent: jsContent || undefined,
       jsSourcePath: jsSourcePath || undefined,
+      widgetInfo: element,
       widgetMgr,
     }
   }, [
@@ -505,6 +515,7 @@ const BidiComponent: FC<BidiComponentProps> = ({
     id,
     jsContent,
     jsSourcePath,
+    element,
     widgetMgr,
   ])
 

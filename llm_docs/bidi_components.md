@@ -31,7 +31,6 @@ The JS code must declare an export default function that will be called every ti
 - data: The data passed into component()
 - key: A key that is unique to this component and this instance. This can be used wherever you need a string that you know hasn’t been used anywhere else in the DOM.
 - parentElement: The DOM node that you should write this component’s DOM into.
-  !!!! CHANGED AND IMPLEMENTATION NEEDS TO BE UPDATED TO MATCH THIS !!!!
 - setStateValue: A function that passes a value to the Python side of the component and causes the Streamlit script to rerun. This accepts two arguments: eventType and value.
 - setTriggerValue: A function that passes a value to the Python side of the component and causes the Streamlit script to rerun. On subsequent reruns, this value is reset to None. This accepts two arguments: eventType and value.
 
@@ -62,20 +61,14 @@ To load multiple CSS files, use @import.
 
 ### `on_{state_name}_change`
 
-!!!! CHANGED AND IMPLEMENTATION NEEDS TO BE UPDATED TO MATCH THIS !!!!
-
 - Any keyword argument whose name starts with on\_ will be treated as a callback function to call when the JS side calls setStateValue or setTriggerValue for that given event type.
 - This is accessible from the JS module as described in the documentation for the js argument.
 
 ### `args`
 
-!!!! CHANGED AND IMPLEMENTATION NEEDS TO BE UPDATED TO MATCH THIS !!!!
-
 - Arguments for on\_{state_name}\_change handlers
 
 ### `kwargs`
-
-!!!! CHANGED AND IMPLEMENTATION NEEDS TO BE UPDATED TO MATCH THIS !!!!
 
 - Keyword arguments for on\_{state_name}\_change handlers
 
