@@ -204,12 +204,11 @@ class BidiComponentMixin:
         *args: Any,
         key: str | None = None,
         default: Any = None,
-        on_change: WidgetCallback | None = None,
         child_container_count: int = 0,
         # TODO: This needs to have a better type + support Arrow
         data: Any | None = None,
         **kwargs: Any,
-    ) -> BidiComponentState:
+    ) -> BidiComponentResult:
         """Add a bidirectional component instance to the app using a registered component.
 
         Parameters
@@ -226,8 +225,6 @@ class BidiComponentMixin:
         default: any or None
             The default return value for the component. This is returned when
             the component's frontend hasn't yet specified a value.
-        on_change: WidgetCallback or None
-            An optional callback invoked when the component's value changes.
         child_container_count : int
             The number of child containers this component has. Default is 0.
         **kwargs
@@ -235,7 +232,7 @@ class BidiComponentMixin:
 
         Returns
         -------
-        BidiComponentState
+        BidiComponentResult
             A dictionary-like object representing the component's state,
             supporting attribute and key-based access for the 'value' field.
 
@@ -254,7 +251,7 @@ class BidiComponentMixin:
         if ctx is None:
             # Create an empty state with the default value and return it
             state: BidiComponentState = {"value": default}
-            return cast("BidiComponentState", AttributeDictionary(state))
+            return BidiComponentResult(self.dg, state, {})
 
         # Get the component definition from the registry
         from streamlit.runtime import Runtime
@@ -283,17 +280,29 @@ class BidiComponentMixin:
             form_id=current_form_id(self.dg),
         )
 
-        handlers: dict[str, WidgetCallback] = {}
-        if callable(on_change):
-            handlers["change"] = on_change
+        # ------------------------------------------------------------------
+        # 1. Parse user-supplied callbacks
+        # ------------------------------------------------------------------
+        # Event-specific callbacks follow the pattern ``on_<event>_change``.
+        # We deliberately *do not* support the legacy generic ``on_change``
+        # or ``on_<event>`` forms.
+        callbacks_by_event: dict[str, WidgetCallback] = {}
+        for kwarg_key, kwarg_value in list(kwargs.items()):
+            if not callable(kwarg_value):
+                continue
 
-        # Example for other handlers like on_click from kwargs
-        # We can make this more robust or configurable if needed.
-        for kwarg_key, kwarg_value in kwargs.items():
-            if kwarg_key.startswith("on_") and callable(kwarg_value):
-                event_name = kwarg_key[3:]  # remove "on_"
-                if event_name:  # Ensure we have an event name
-                    handlers[event_name] = kwarg_value
+            if kwarg_key.startswith("on_") and kwarg_key.endswith("_change"):
+                # Preferred pattern: on_<event>_change
+                event_name = kwarg_key[3:-7]  # strip prefix + suffix
+            else:
+                # Not an event callback we recognise - skip.
+                continue
+
+            if not event_name:
+                # Malformed name like "on__change" - ignore for now.
+                continue
+
+            callbacks_by_event[event_name] = kwarg_value
 
         # Set up the component proto
         bidi_component_proto = BidiComponentProto()
@@ -309,25 +318,68 @@ class BidiComponentMixin:
         bidi_component_proto.data = json.dumps(data) if data else ""
         bidi_component_proto.child_container_count = child_container_count
         bidi_component_proto.form_id = current_form_id(self.dg)
-        if handlers:
-            bidi_component_proto.registered_handler_names.extend(handlers.keys())
+        if callbacks_by_event:
+            bidi_component_proto.registered_handler_names.extend(
+                callbacks_by_event.keys()
+            )
 
         # Instantiate the Serde for this component instance
         serde = BidiComponentSerde()
 
+        # ------------------------------------------------------------------
+        # 2. Register the *persistent state* widget (one per component)
+        # ------------------------------------------------------------------
         component_state = register_widget(
             bidi_component_proto.id,
             deserializer=serde.deserialize,
             serializer=serde.serialize,
             ctx=ctx,
-            callbacks=handlers if handlers else None,
+            callbacks=None,
             value_type="json_value",
         )
 
-        # Enqueue using the dg instance
+        # ------------------------------------------------------------------
+        # 3. Register *trigger* widgets - one per event
+        # ------------------------------------------------------------------
+        trigger_vals: dict[str, Any] = {}
+
+        for evt_name, evt_cb in callbacks_by_event.items():
+            trig_id = make_trigger_id(computed_id, evt_name)
+
+            trig_state = register_widget(
+                trig_id,
+                deserializer=lambda s: json.loads(s) if s else None,
+                serializer=lambda v: json.dumps(v),
+                ctx=ctx,
+                callbacks={"change": evt_cb} if evt_cb else None,
+                value_type="json_trigger_value",
+            )
+
+            trigger_vals[evt_name] = trig_state.value
+
+        # Note: We intentionally do not inspect SessionState for additional
+        # trigger widget IDs here because doing so can raise KeyErrors when
+        # widgets are freshly registered but their values haven't been
+        # populated yet. Only the triggers explicitly registered above are
+        # included in the result object.
+
+        # ------------------------------------------------------------------
+        # 4. Enqueue proto and assemble the result object
+        # ------------------------------------------------------------------
         self.dg._enqueue(INTERNAL_COMPONENT_NAME, bidi_component_proto)
 
-        return cast("BidiComponentState", component_state.value)
+        # `component_state.value` is expected to be a mapping-like object (via
+        # our Serde), but we defensively normalise it into a plain `dict` so
+        # that users never observe AttributeDictionary instances nested inside
+        # the result.
+        state_raw = component_state.value
+        if isinstance(state_raw, dict):
+            # Shallow-copy to avoid leaking references.
+            state_vals: dict[str, Any] = dict(state_raw)
+        else:
+            state_vals = {"value": state_raw}
+
+        return BidiComponentResult(self.dg, state_vals, trigger_vals)
 
     @property
     def dg(self) -> DeltaGenerator:

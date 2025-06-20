@@ -193,6 +193,27 @@ export class WidgetStateManager {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TODO: Replace 'any' with a more specific type.
   private readonly elementStates = new Map<string, Map<string, any>>()
 
+  /**
+   * Debouncing helpers for trigger widgets.
+   *
+   * Multiple calls to `setTriggerValue` that happen within the same
+   * JavaScript macrotask (for example, when a single click handler invokes
+   * `setTriggerValue` several times for different trigger names) should be
+   * batched into a single `updateWidgets` message. Otherwise, each call would
+   * schedule its own `setTimeout(…, 0)` which results in multiple
+   * `updateWidgets` messages being sent in quick succession. The Streamlit
+   * backend only handles the *latest* message before rerunning the script,
+   * which means earlier triggers can be lost. We fix this by batching.
+   */
+  private pendingTriggerIds = new Set<string>()
+
+  /** Promise resolvers that should run once the pending trigger batch has
+   *  been flushed to the backend. */
+  private triggerFlushResolvers: Array<() => void> = []
+
+  /** Indicates whether we already scheduled a macrotask-level flush. */
+  private triggerFlushScheduled = false
+
   constructor(props: Props) {
     this.props = props
     this.formsData = createFormsData()
@@ -343,13 +364,42 @@ export class WidgetStateManager {
       // Simple boolean trigger.
       widgetState.triggerValue = true
     } else {
-      // Bidi Component v2: arbitrary payload transported via
-      // json_trigger_value.
+      // Bidi Component v2: arbitrary payload transported via json_trigger_value.
       widgetState.jsonTriggerValue =
         typeof value === "string" ? value : JSON.stringify(value)
     }
 
-    return this.setTriggerValueAtEndOfEventLoop(widget, source, fragmentId)
+    // --------------------------------------------------------------
+    // Batch trigger updates fired during the same JavaScript macrotask.
+    // --------------------------------------------------------------
+    this.pendingTriggerIds.add(widget.id)
+
+    return new Promise(resolve => {
+      // Queue resolver so callers still get the same promise-based API.
+      this.triggerFlushResolvers.push(resolve)
+
+      // If a flush is already scheduled we don't need to schedule another one.
+      if (this.triggerFlushScheduled) {
+        return
+      }
+
+      this.triggerFlushScheduled = true
+
+      setTimeout(() => {
+        // Send a *single* widgets update containing **all** pending triggers.
+        this.sendUpdateWidgetsMessage(fragmentId)
+
+        // Clean-up temporary widget states so they don't leak into future updates.
+        this.pendingTriggerIds.forEach(id => this.deleteWidgetState(id))
+        this.pendingTriggerIds.clear()
+
+        // Resolve all promises that were waiting for this flush.
+        this.triggerFlushResolvers.forEach(r => r())
+        this.triggerFlushResolvers = []
+
+        this.triggerFlushScheduled = false
+      }, 0)
+    })
   }
 
   public getBoolValue(widget: WidgetInfo): boolean | undefined {

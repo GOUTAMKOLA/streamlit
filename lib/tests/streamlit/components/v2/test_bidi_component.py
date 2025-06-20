@@ -279,15 +279,13 @@ class BidiComponentTest(DeltaGeneratorTestCase):
             )
         )
 
-        # Create mock callbacks
-        on_value_change_callback = MagicMock()
-        on_click_change_callback = MagicMock()
+        # Create mock callback
+        on_click_callback = MagicMock()
 
-        # Call the component with callbacks using new pattern
+        # Call the component with event-specific callback
         result = st.bidi_component(
             "callback_component",
-            on_value_change=on_value_change_callback,
-            on_click_change=on_click_change_callback,
+            on_click_change=on_click_callback,
         )
 
         # Verify the result
@@ -297,9 +295,8 @@ class BidiComponentTest(DeltaGeneratorTestCase):
         delta = self.get_delta_from_queue()
         bidi_component_proto = delta.new_element.bidi_component
         assert bidi_component_proto.component_name == "callback_component"
-        # Should have both value and click handlers registered
+        # Should have the click handler registered via trigger widget mechanism
         handler_names = list(bidi_component_proto.registered_handler_names)
-        assert "value" in handler_names
         assert "click" in handler_names
 
     def test_component_with_child_containers(self):
