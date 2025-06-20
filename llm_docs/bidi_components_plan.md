@@ -259,5 +259,3 @@ Callbacks:
 
 - `on_my_stateful_value_change` called whenever the _value_ differs from previous run.
 - `on_my_trigger_change` called exactly when `my_trigger` widget's `json_trigger_value` is set (same run where `True` is observed).
-
-This satisfies every product-spec bullet: multiple dynamic callbacks, unified return object, persistent & trigger semantics, minimal core modifications.
