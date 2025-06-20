@@ -17,6 +17,7 @@
 import React, {
   FC,
   memo,
+  useCallback,
   useContext,
   useEffect,
   useId,
@@ -29,7 +30,7 @@ import { getLogger } from "loglevel"
 
 import type { BidiComponent as BidiComponentProto } from "@streamlit/protobuf"
 
-import type { WidgetInfo, WidgetStateManager } from "~lib/WidgetStateManager"
+import type { WidgetStateManager } from "~lib/WidgetStateManager"
 import ErrorElement from "~lib/components/shared/ErrorElement"
 import { useRequiredContext } from "~lib/hooks/useRequiredContext"
 import { LibContext } from "~lib/components/core/LibContext"
@@ -69,25 +70,25 @@ const handleError = (
   setError(normalizedError)
 }
 
-const loadAndRunModule = async ({
+const loadAndRunModule = async <T extends Record<string, unknown>>({
   componentId,
   componentIdForWidgetMgr,
   componentName,
   data,
   fragmentId,
+  getWidgetValue,
   moduleUrl,
   parentElement,
-  widgetInfo,
   widgetMgr,
 }: {
   componentId: string
   componentIdForWidgetMgr: string
   componentName: string
   data: unknown
+  getWidgetValue: () => T
   fragmentId: string | undefined
   moduleUrl: string
   parentElement: HTMLElement | ShadowRoot
-  widgetInfo: WidgetInfo
   widgetMgr: WidgetStateManager
 }): Promise<ComponentResult> => {
   const module = await import(/* @vite-ignore */ moduleUrl)
@@ -107,9 +108,9 @@ const loadAndRunModule = async ({
     let newValue: T[keyof T]
 
     try {
-      const widgetState = widgetMgr.getJsonValue(widgetInfo)
-      const existingValue = widgetState ? JSON.parse(widgetState) : {}
+      const existingValue = getWidgetValue()
 
+      // @ts-expect-error -- TODO: Fix this
       newValue = { ...existingValue, [name]: value }
     } catch (error) {
       LOG.error(`Failed to get existing value for ${name}`, error)
@@ -253,10 +254,10 @@ const useHandleJsContent = ({
     componentName,
     data,
     fragmentId,
+    getWidgetValue,
     id,
     jsContent,
     jsSourcePath,
-    widgetInfo,
     widgetMgr,
   } = useRequiredContext(BidiComponentContext)
 
@@ -300,15 +301,15 @@ const useHandleJsContent = ({
           )}`
 
           const result = await loadAndRunModule({
-            componentName,
-            moduleUrl: dataUri,
             componentId,
-            parentElement: containerRefCurrent,
-            data: parsedData,
             componentIdForWidgetMgr: id,
+            componentName,
+            data: parsedData,
             fragmentId,
+            getWidgetValue,
+            moduleUrl: dataUri,
+            parentElement: containerRefCurrent,
             widgetMgr,
-            widgetInfo,
           })
 
           cleanup = result.cleanup
@@ -334,15 +335,15 @@ const useHandleJsContent = ({
 
             // Run the module
             const result = await loadAndRunModule({
-              componentName,
-              moduleUrl: scriptUrl,
               componentId,
-              parentElement: containerRefCurrent,
-              data: parsedData,
               componentIdForWidgetMgr: id,
+              componentName,
+              data: parsedData,
               fragmentId,
+              getWidgetValue,
+              moduleUrl: scriptUrl,
+              parentElement: containerRefCurrent,
               widgetMgr,
-              widgetInfo,
             })
 
             cleanup = result.cleanup
@@ -384,12 +385,12 @@ const useHandleJsContent = ({
     containerRef,
     data,
     fragmentId,
+    getWidgetValue,
     id,
     jsContent,
     jsSourcePathUrl,
     setError,
     skip,
-    widgetInfo,
     widgetMgr,
   ])
 }
@@ -491,18 +492,25 @@ const BidiComponent: FC<BidiComponentProps> = ({
     jsSourcePath,
   } = element
 
-  const contextValue = useMemo<BidiComponentContextShape>(() => {
+  const getWidgetValue = useCallback(() => {
+    const value = widgetMgr.getJsonValue(element)
+    return value ? JSON.parse(value) : {}
+  }, [element, widgetMgr])
+
+  const contextValue = useMemo<
+    BidiComponentContextShape<Record<string, unknown>>
+  >(() => {
     return {
       componentName,
       cssContent: cssContent?.trim(),
       cssSourcePath: cssSourcePath || undefined,
       data: data || undefined,
       fragmentId,
+      getWidgetValue,
       htmlContent: htmlContent?.trim(),
       id,
       jsContent: jsContent || undefined,
       jsSourcePath: jsSourcePath || undefined,
-      widgetInfo: element,
       widgetMgr,
     }
   }, [
@@ -511,11 +519,11 @@ const BidiComponent: FC<BidiComponentProps> = ({
     cssSourcePath,
     data,
     fragmentId,
+    getWidgetValue,
     htmlContent,
     id,
     jsContent,
     jsSourcePath,
-    element,
     widgetMgr,
   ])
 
