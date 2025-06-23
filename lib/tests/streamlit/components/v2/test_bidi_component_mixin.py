@@ -98,18 +98,30 @@ class BidiComponentMixinTest(DeltaGeneratorTestCase):
         assert ctx is not None, "ScriptRunContext missing in test"
 
         # Compute expected trigger ids
+        # `ctx.widget_ids_this_run` is the publicly exposed collection of widget
+        # IDs that were instantiated during the current script run. It is safe
+        # to iterate over this set without triggering additional Session State
+        # look-ups that could raise ``KeyError``.
+
         base_id = next(
             wid
-            for wid in ctx.session_state
+            for wid in ctx.widget_ids_this_run
             if wid.startswith("$$ID") and EVENT_DELIM not in wid
         )
         expected_click_id = make_trigger_id(base_id, "click")
         expected_hover_id = make_trigger_id(base_id, "hover")
 
-        metadata_click = ctx.session_state._new_widget_state.widget_metadata[
+        # Access the *internal* SessionState object to retrieve widget
+        # metadata, which is required to validate the registration. The public
+        # SafeSessionState wrapper does not expose this information directly,
+        # so accessing the protected member is acceptable in our unit tests.
+
+        internal_state = ctx.session_state._state  # SessionState instance
+
+        metadata_click = internal_state._new_widget_state.widget_metadata[
             expected_click_id
         ]
-        metadata_hover = ctx.session_state._new_widget_state.widget_metadata[
+        metadata_hover = internal_state._new_widget_state.widget_metadata[
             expected_hover_id
         ]
 
