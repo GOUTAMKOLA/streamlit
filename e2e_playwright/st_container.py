@@ -34,7 +34,7 @@ with st.container(border=True):
         "This is inside a container with a border. And it doesn't overflow "
         "the borders if the text requires multiple lines."
     )
-    st.button("Stretch full width", use_container_width=True)
+    st.button("Stretch full width", width="stretch")
 
 with st.container(height=200):
     st.markdown("This is inside a scrolling container.")
