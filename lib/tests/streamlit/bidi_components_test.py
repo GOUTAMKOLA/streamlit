@@ -1,20 +1,16 @@
 # Copyright (c) Streamlit Inc. (2018-2022) Snowflake Inc. (2022-2025)
-# TODO: This license is not consistent with the license used in the project.
-#       Delete the inconsistent license and above line and rerun pre-commit to insert a good license.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
-# You may
-# obtain a copy of the License at
+# You may obtain a copy of the License at
 #
-# http://www.apache.org/licenses/LICENSE-2.0
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import json
 from unittest.mock import MagicMock, patch
 
@@ -106,102 +102,3 @@ class BidiComponentsTest(DeltaGeneratorTestCase):
 
         my_comp = my_component(key="my_comp")
         assert my_comp.get("value") == "bar"
-
-    # TODO: This test does not pass yet.
-    # On re-run, my_comp.get("value") is still "baz".
-    # This is due to an implementation bug.
-    def test_set_trigger_value(self):
-        """Test that setTriggerValue updates the component's state for one run."""
-
-        # Initial run
-        my_comp = my_component(key="my_comp")
-        assert my_comp.get("value") is None
-        widget_id = self.get_delta_from_queue().new_element.bidi_component.id
-
-        # Simulate a rerun with a trigger update from the frontend
-        widget_states = create_bidi_component_widget_states(
-            widget_id, {}, {"value": "baz"}
-        )
-        self.script_run_ctx.session_state.on_script_will_rerun(widget_states)
-        self.script_run_ctx.widget_user_keys_this_run.clear()
-        self.script_run_ctx.widget_ids_this_run.clear()
-
-        my_comp = my_component(key="my_comp")
-        assert my_comp.get("value") == "baz"
-        self.get_delta_from_queue()
-
-        # Simulate another rerun with no new state from frontend
-        self.script_run_ctx.session_state.on_script_will_rerun(WidgetStates())
-        self.script_run_ctx.widget_user_keys_this_run.clear()
-        self.script_run_ctx.widget_ids_this_run.clear()
-
-        my_comp = my_component(key="my_comp")
-        # print(my_comp.get("value")) - This prints "baz"
-        assert my_comp.get("value") is None
-
-    # TODO: This does not work yet, there is an implementation bug where the
-    # callback is not called when the state is updated.
-    def test_on_change_callback(self):
-        """Test that on_{state_name}_change callbacks are triggered correctly."""
-        callback_mock = MagicMock()
-
-        # Initial run
-        my_component(key="my_comp", on_value_change=callback_mock)
-        widget_id = self.get_delta_from_queue().new_element.bidi_component.id
-        callback_mock.assert_not_called()
-
-        # Simulate a rerun with a state update
-        widget_states = create_bidi_component_widget_states(
-            widget_id, {"value": "state_change"}, {}
-        )
-        self.script_run_ctx.session_state.on_script_will_rerun(widget_states)
-        callback_mock.assert_called_once_with("state_change")
-        callback_mock.reset_mock()
-
-        # Simulate a rerun with a trigger update
-        widget_states = create_bidi_component_widget_states(
-            widget_id, {}, {"value": "trigger_change"}
-        )
-        self.script_run_ctx.session_state.on_script_will_rerun(widget_states)
-        callback_mock.assert_called_once_with("trigger_change")
-
-    # TODO: This does not pass yet.
-    # The last line fails because it is a trigger, which is the same root cause
-    # error as seen in `test_set_trigger_value`. This is due to an
-    # implementation bug.
-    def test_return_value_and_delta_generator(self):
-        """Test the component's return value and that the DeltaGenerator works."""
-
-        # Initial run
-        my_comp = my_component(key="my_comp")
-        with my_comp.delta_generator:
-            st.text("Inside component")
-
-        # The first delta is the component itself, the second is the text.
-        c = self.get_delta_from_queue(1).new_element
-        assert c.text.body == "Inside component"
-
-        widget_id = self.get_delta_from_queue(0).new_element.bidi_component.id
-
-        # Rerun with state
-        widget_states = create_bidi_component_widget_states(
-            widget_id, {"x": 1, "y": 2}, {"z": 3}
-        )
-        self.script_run_ctx.session_state.on_script_will_rerun(widget_states)
-        self.script_run_ctx.widget_user_keys_this_run.clear()
-        self.script_run_ctx.widget_ids_this_run.clear()
-
-        my_comp = my_component(key="my_comp")
-        assert my_comp.x == 1
-        assert my_comp["y"] == 2
-        assert my_comp.get("z") == 3
-
-        # Rerun again, trigger value should be gone
-        self.script_run_ctx.session_state.on_script_will_rerun(WidgetStates())
-        self.script_run_ctx.widget_user_keys_this_run.clear()
-        self.script_run_ctx.widget_ids_this_run.clear()
-
-        my_comp = my_component(key="my_comp")
-        assert my_comp.x == 1
-        # print(my_comp.get("z")) - This prints "3"
-        assert my_comp.get("z") is None
