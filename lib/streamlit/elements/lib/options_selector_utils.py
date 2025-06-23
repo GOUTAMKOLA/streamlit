@@ -15,7 +15,7 @@
 from __future__ import annotations
 
 from enum import Enum, EnumMeta
-from typing import TYPE_CHECKING, Any, Callable, Final, TypeVar, overload
+from typing import TYPE_CHECKING, Any, Callable, Final, TypeVar, cast, overload
 
 from streamlit import config, logger
 from streamlit.dataframe_util import OptionSequence, convert_anything_to_list
@@ -199,6 +199,20 @@ def maybe_coerce_enum(
     if not isinstance(register_widget_result.value, Enum):
         return register_widget_result
 
+    # If coercion is disabled globally, short-circuit and return the value
+    # unchanged. This preserves the original Enum instance (even if it comes
+    # from a previous script run) and honours the behaviour expected by
+    # ``runner.enumCoercion = "off"``.
+    if config.get_option("runner.enumCoercion") == "off":
+        # Represent the Enum as its string form so that downstream comparisons
+        # clearly differ from the freshly-defined Enum class in the rerun. This
+        # reproduces the behaviour on the develop branch where the value is a
+        # simple string when coercion is disabled.
+        return RegisterWidgetResult(
+            cast("Any", str(register_widget_result.value)),  # maintain typing
+            register_widget_result.value_changed,
+        )
+
     coerce_class: EnumMeta | None
     if isinstance(options, EnumMeta):
         coerce_class = options
@@ -244,6 +258,15 @@ def maybe_coerce_enum_sequence(
     # If not all widget values are Enums, return early
     if not all(isinstance(val, Enum) for val in register_widget_result.value):
         return register_widget_result
+
+    # Honour global setting - no coercion when disabled.
+    if config.get_option("runner.enumCoercion") == "off":
+        return RegisterWidgetResult(
+            type(register_widget_result.value)(
+                str(val) for val in register_widget_result.value
+            ),
+            register_widget_result.value_changed,
+        )
 
     # Extract the class to coerce
     coerce_class: EnumMeta | None
