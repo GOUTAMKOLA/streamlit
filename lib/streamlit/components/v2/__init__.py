@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from streamlit.runtime.state.common import WidgetCallback
 
 
-def parse_callbacks(**kwargs) -> dict[str, WidgetCallback]:
+def parse_callbacks(**kwargs: Any) -> dict[str, WidgetCallback]:
     """Parse on_* keyword arguments into event callbacks.
 
     Parameters

@@ -133,7 +133,7 @@ class BidiComponentDefinition:
 
                 return True, abs_path
             except Exception:
-                _LOGGER.exception(f"Failed to process file path '{content_str}'")
+                _LOGGER.exception("Failed to process file path %s", content_str)
                 raise
 
         # For strings, we need to determine if it's a file path or content
@@ -167,7 +167,7 @@ class BidiComponentDefinition:
 
                     return True, abs_path
                 except Exception:
-                    _LOGGER.exception(f"Failed to process file path '{content}'")
+                    _LOGGER.exception("Failed to process file path %s", content)
                     raise
 
         # If we get here, it's content, not a path
@@ -267,13 +267,14 @@ class BidiComponentRegistry:
                 existing_definition = self._components[name]
                 if existing_definition != definition:
                     _LOGGER.warning(
-                        f"Component '{name}' is already registered. Overwriting "
+                        "Component %s is already registered. Overwriting "
                         "previous definition. This may lead to unexpected behavior "
                         "if different modules register the same component name with "
-                        "different definitions."
+                        "different definitions.",
+                        name,
                     )
             self._components[name] = definition
-            _LOGGER.debug(f"Registered component '{name}'")
+            _LOGGER.debug("Registered component %s", name)
 
     def get(self, name: str) -> BidiComponentDefinition | None:
         """Get a component definition by name.
@@ -304,7 +305,7 @@ class BidiComponentRegistry:
         with self._lock:
             if name in self._components:
                 del self._components[name]
-                _LOGGER.debug(f"Unregistered component '{name}'")
+                _LOGGER.debug("Unregistered component %s", name)
 
     def clear(self) -> None:
         """Clear all component definitions from the registry."""
