@@ -331,14 +331,121 @@ class BidiComponentMixin:
         # ------------------------------------------------------------------
         # 2. Register the *persistent state* widget (one per component)
         # ------------------------------------------------------------------
+
+        # When the frontend calls `setStateValue`, it updates the component's
+        # *persistent* JSON state (one per component instance). In order to
+        # surface these updates to the user we attach a single "change"
+        # callback to this state widget that performs a fine-grained diff and
+        # only invokes the callbacks whose associated key actually changed.
+
+        # Keep track of the previous state across callback invocations so that
+        # we can detect which keys were modified. We initialise it to an empty
+        # dict here and populate it with the component's current state once
+        # the widget is registered (see further below).
+        _prev_state: dict[str, Any] = {}
+
+        def _on_component_state_change() -> None:
+            """Dispatch state-change notifications to the *relevant* handlers.
+
+            We compare the latest component state with the previously cached
+            version and identify which top-level keys (i.e. state entries)
+            actually changed. Only the callbacks that correspond to those
+            keys are executed. This prevents unrelated callbacks from firing
+            when their piece of state remained untouched.
+            """
+
+            nonlocal _prev_state
+
+            # Fetch the *latest* component state from Session State instead of
+            # relying on the stale ``component_state`` captured from the script
+            # run in which this callback was registered. Using Session State
+            # guarantees we always operate on the up-to-date value produced by
+            # the most recent frontend → backend update.
+
+            current_ctx = get_script_run_ctx()
+
+            # If, for some unexpected reason, we don't have a script context
+            # we bail early - there's nothing useful we can do.
+            if current_ctx is None:
+                return
+
+            try:
+                raw_val = current_ctx.session_state[computed_id]
+            except KeyError:
+                # The component might have been removed in the meantime. Skip.
+                return
+
+            # `raw_val` may have the shape `{ "value": {...} }` due to the Serde
+            # wrapping. We want the *inner* mapping that contains the per-key
+            # state entries (e.g. "range", "text"). If the wrapping is missing,
+            # we assume the top-level mapping is already the state.
+            if isinstance(raw_val, dict) and "value" in raw_val and len(raw_val) == 1:
+                current_state_dict = (
+                    raw_val["value"] if isinstance(raw_val["value"], dict) else {}
+                )
+            elif isinstance(raw_val, dict):
+                current_state_dict = raw_val
+            else:
+                current_state_dict = {}
+
+            # Determine which keys were added, removed or had their value
+            # changed. We treat None vs missing as a change so that setting a
+            # key to None still triggers its callback.
+            changed_keys: set[str] = set()
+
+            # Keys that are new or whose value differs from the previous run.
+            for k, v in current_state_dict.items():
+                if k not in _prev_state or _prev_state.get(k) != v:
+                    changed_keys.add(k)
+
+            # Keys that were removed.
+            for k in _prev_state:
+                if k not in current_state_dict:
+                    changed_keys.add(k)
+
+            # Execute the callbacks associated with the changed keys.
+            for changed_key in changed_keys:
+                cb = callbacks_by_event.get(changed_key)
+                if cb is None:
+                    continue
+                cb()
+
+            # Update the cached copy for the next comparison.
+            _prev_state = dict(current_state_dict)
+
         component_state = register_widget(
             bidi_component_proto.id,
             deserializer=serde.deserialize,
             serializer=serde.serialize,
             ctx=ctx,
-            callbacks=None,
+            callbacks={"change": _on_component_state_change}
+            if callbacks_by_event
+            else None,
             value_type="json_value",
         )
+
+        # Prime `_prev_state` with the *current* component state so that the
+        # very first diff performed inside `_on_component_state_change` (i.e.
+        # after the user interacts with the component for the first time)
+        # correctly reflects only the keys that actually changed.
+        # `component_state.value` may include the additional ``{"value": ...}``
+        # wrapper injected by our Serde. To ensure we treat individual *state
+        # keys* consistently we unwrap one level if that structure is
+        # detected.
+
+        _initial_raw_val = component_state.value  # AttributeDictionary or primitive
+
+        if (
+            isinstance(_initial_raw_val, dict)
+            and "value" in _initial_raw_val
+            and len(_initial_raw_val) == 1
+            and isinstance(_initial_raw_val["value"], dict)
+        ):
+            _prev_state = dict(_initial_raw_val["value"])
+        elif isinstance(_initial_raw_val, dict):
+            _prev_state = dict(_initial_raw_val)
+        else:
+            _prev_state = {}
 
         # ------------------------------------------------------------------
         # 3. Register *trigger* widgets - one per event
