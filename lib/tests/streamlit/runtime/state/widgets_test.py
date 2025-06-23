@@ -132,20 +132,20 @@ class WidgetManagerTests(unittest.TestCase):
 
         callback_cases = [
             ("trigger", "trigger_value", None, None, None),
-            ("bool", "bool_value", mock_callback, None, None),
-            ("bool2", "bool_value", mock_callback, None, None),
-            ("float", "double_value", mock_callback, (1,), None),
-            ("int", "int_value", mock_callback, None, {"x": 2}),
-            ("string", "string_value", mock_callback, (1,), {"x": 2}),
+            ("bool", "bool_value", {"change": mock_callback}, None, None),
+            ("bool2", "bool_value", {"change": mock_callback}, None, None),
+            ("float", "double_value", {"change": mock_callback}, (1,), None),
+            ("int", "int_value", {"change": mock_callback}, None, {"x": 2}),
+            ("string", "string_value", {"change": mock_callback}, (1,), {"x": 2}),
         ]
-        for widget_id, value_type, callback, args, kwargs in callback_cases:
+        for widget_id, value_type, callbacks, args, kwargs in callback_cases:
             session_state._set_widget_metadata(
                 WidgetMetadata(
                     widget_id,
                     deserializer,
                     lambda x: x,
                     value_type=value_type,
-                    callback=callback,
+                    callbacks=callbacks,
                     callback_args=args,
                     callback_kwargs=kwargs,
                 )

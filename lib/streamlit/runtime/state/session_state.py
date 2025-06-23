@@ -612,7 +612,7 @@ class SessionState:
             widget_proto_state = self._new_widget_state.get_serialized(wid)
             if widget_proto_state and widget_proto_state.trigger_value:
                 click_callback = metadata.callbacks.get("click")
-                if click_callback:
+                if click_callback is not None:
                     try:
                         execute_callback(click_callback, metadata, args, kwargs)
                     except RerunException:
@@ -622,7 +622,7 @@ class SessionState:
             #    _widget_changed compares the primary deserialized value against _old_state.
             if self._widget_changed(wid):
                 change_callback = metadata.callbacks.get("change")
-                if change_callback:
+                if change_callback is not None:
                     try:
                         # Ensure we don't call the same callback instance twice if it was already
                         # triggered by trigger_value (e.g. if "click" and "change" are the same function).
