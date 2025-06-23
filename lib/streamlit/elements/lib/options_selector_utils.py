@@ -205,9 +205,7 @@ def maybe_coerce_enum(
     # ``runner.enumCoercion = "off"``.
     if config.get_option("runner.enumCoercion") == "off":
         # Represent the Enum as its string form so that downstream comparisons
-        # clearly differ from the freshly-defined Enum class in the rerun. This
-        # reproduces the behaviour on the develop branch where the value is a
-        # simple string when coercion is disabled.
+        # clearly differ from the freshly-defined Enum class in the rerun.
         return RegisterWidgetResult(
             cast("Any", str(register_widget_result.value)),  # maintain typing
             register_widget_result.value_changed,
@@ -259,7 +257,7 @@ def maybe_coerce_enum_sequence(
     if not all(isinstance(val, Enum) for val in register_widget_result.value):
         return register_widget_result
 
-    # Honour global setting - no coercion when disabled.
+    # Honor global setting - no coercion when disabled.
     if config.get_option("runner.enumCoercion") == "off":
         return RegisterWidgetResult(
             type(register_widget_result.value)(
