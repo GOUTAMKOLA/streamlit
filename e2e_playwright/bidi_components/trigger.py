@@ -27,33 +27,31 @@ st.header("Bidi Component with Trigger")
 
 JS_CODE = """
 export default function(component) {
-  console.log("I am a bidi component", component)
+  const { parentElement, setTriggerValue } = component
 
-  const { parentElement, setStateValue, setTriggerValue } = component
-
-  const handleClick = () => {
-    setTriggerValue("clicked", true)
+  const handleClickFoo = () => {
+    setTriggerValue("foo", true)
   }
 
-  const handleClick2 = () => {
-    setTriggerValue("clicked2", true)
+  const handleClickBar = () => {
+    setTriggerValue("bar", true)
   }
 
-  parentElement.addEventListener("click", handleClick)
-  parentElement.addEventListener("click", handleClick2)
+  parentElement.addEventListener("click", handleClickFoo)
+  parentElement.addEventListener("click", handleClickBar)
 
   return () => {
     console.log("Cleaning up")
-    parentElement.removeEventListener("click", handleClick)
-    parentElement.removeEventListener("click", handleClick2)
+    parentElement.removeEventListener("click", handleClickFoo)
+    parentElement.removeEventListener("click", handleClickBar)
   }
 }
 """
 
 HTML_CODE = """
 <div>
-<button>Click me</button>
-<button>Click me 2</button>
+<button>Click foo</button>
+<button>Click bar</button>
 </div>
 """
 
@@ -62,8 +60,8 @@ def my_component(
     *,
     key: str | None = None,
     data: Any | None = None,
-    on_click: Callable | None = None,
-    on_click2: Callable | None = None,
+    on_foo_change: Callable | None = None,
+    on_bar_change: Callable | None = None,
 ) -> BidiComponentState:
     out = st.components.v2.component(
         name="my_component",
@@ -72,57 +70,57 @@ def my_component(
         isolate_styles=True,
         key=key,
         data=data,
-        on_clicked_change=on_click,
-        on_clicked2_change=on_click2,
+        on_foo_change=on_foo_change,
+        on_bar_change=on_bar_change,
     )
     return out
 
 
-if "click_count" not in st.session_state:
-    st.session_state.click_count = 0
+if "foo_count" not in st.session_state:
+    st.session_state.foo_count = 0
 
-if "click_count2" not in st.session_state:
-    st.session_state.click_count2 = 0
+if "bar_count" not in st.session_state:
+    st.session_state.bar_count = 0
 
-if "last_on_click_processed" not in st.session_state:
-    st.session_state.last_on_click_processed = None
+if "last_on_foo_change_processed" not in st.session_state:
+    st.session_state.last_on_foo_change_processed = None
 
-if "last_on_click2_processed" not in st.session_state:
-    st.session_state.last_on_click2_processed = None
+if "last_on_bar_change_processed" not in st.session_state:
+    st.session_state.last_on_bar_change_processed = None
 
 
-def handle_click():
+def handle_foo_change():
     print("Clicked")
-    st.session_state.click_count += 1
-    st.session_state.last_on_click_processed = time.strftime("%H:%M:%S")
+    st.session_state.foo_count += 1
+    st.session_state.last_on_foo_change_processed = time.strftime("%H:%M:%S")
 
 
-def handle_click2():
+def handle_bar_change():
     print("Clicked 2")
-    st.session_state.click_count2 += 1
-    st.session_state.last_on_click2_processed = time.strftime("%H:%M:%S")
+    st.session_state.bar_count += 1
+    st.session_state.last_on_bar_change_processed = time.strftime("%H:%M:%S")
 
 
 result = my_component(
     key="my_component_1",
-    on_click=handle_click,
-    on_click2=handle_click2,
+    on_foo_change=handle_foo_change,
+    on_bar_change=handle_bar_change,
 )
 
 st.write(f"Result: {result}")
-st.write(f"Click count: {st.session_state.click_count}")
+st.write(f"Foo count: {st.session_state.foo_count}")
 st.write(
-    f"Last on_click callback processed at: {st.session_state.last_on_click_processed}"
+    f"Last on_foo_change callback processed at: {st.session_state.last_on_foo_change_processed}"
 )
 
 
-st.write(f"Click count 2: {st.session_state.click_count2}")
+st.write(f"Bar count: {st.session_state.bar_count}")
 st.write(
-    f"Last on_click2 callback processed at: {st.session_state.last_on_click2_processed}"
+    f"Last on_bar_change callback processed at: {st.session_state.last_on_bar_change_processed}"
 )
 
 
-is_clicked = st.button("Click me")
+is_clicked = st.button("st.button trigger")
 
 if is_clicked:
-    st.write("Button was clicked")
+    st.write("st.button was clicked")
