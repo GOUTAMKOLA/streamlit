@@ -37,21 +37,24 @@ export default function(component) {
     setTriggerValue("bar", true)
   }
 
-  parentElement.addEventListener("click", handleClickFoo)
-  parentElement.addEventListener("click", handleClickBar)
+  const fooButton = parentElement.querySelector("#foo-button")
+  const barButton = parentElement.querySelector("#bar-button")
+
+  fooButton.addEventListener("click", handleClickFoo)
+  barButton.addEventListener("click", handleClickBar)
 
   return () => {
     console.log("Cleaning up")
-    parentElement.removeEventListener("click", handleClickFoo)
-    parentElement.removeEventListener("click", handleClickBar)
+    fooButton.removeEventListener("click", handleClickFoo)
+    barButton.removeEventListener("click", handleClickBar)
   }
 }
 """
 
 HTML_CODE = """
 <div>
-<button>Click foo</button>
-<button>Click bar</button>
+<button id="foo-button">Click foo</button>
+<button id="bar-button">Click bar</button>
 </div>
 """
 
