@@ -62,8 +62,7 @@ class BidiComponentTest(DeltaGeneratorTestCase):
         result = st.bidi_component("js_only_component")
 
         # Verify the result
-        assert hasattr(result, "value")
-        assert result.value is None  # Default value
+        assert hasattr(result, "delta_generator")
 
         # Verify the proto was enqueued
         delta = self.get_delta_from_queue()
@@ -86,8 +85,7 @@ class BidiComponentTest(DeltaGeneratorTestCase):
         result = st.bidi_component("html_only_component")
 
         # Verify the result
-        assert hasattr(result, "value")
-        assert result.value is None  # Default value
+        assert hasattr(result, "delta_generator")
 
         # Verify the proto was enqueued
         delta = self.get_delta_from_queue()
@@ -113,8 +111,7 @@ class BidiComponentTest(DeltaGeneratorTestCase):
             result = st.bidi_component("js_url_component")
 
             # Verify the result
-            assert hasattr(result, "value")
-            assert result.value is None  # Default value
+            assert hasattr(result, "delta_generator")
 
             # Verify the proto was enqueued
             delta = self.get_delta_from_queue()
@@ -139,8 +136,7 @@ class BidiComponentTest(DeltaGeneratorTestCase):
         result = st.bidi_component("full_component")
 
         # Verify the result
-        assert hasattr(result, "value")
-        assert result.value is None  # Default value
+        assert hasattr(result, "delta_generator")
 
         # Verify the proto was enqueued
         delta = self.get_delta_from_queue()
@@ -200,26 +196,6 @@ class BidiComponentTest(DeltaGeneratorTestCase):
         ):
             st.bidi_component("nonexistent_component")
 
-    def test_component_with_default_value(self):
-        """Test component with a default value."""
-        # Register a component
-        self.mock_registry.register(
-            BidiComponentDefinition(
-                name="default_value_component",
-                js="console.log('hello world');",
-            )
-        )
-
-        # Call the component with a default value
-        default_value = {"test": "value"}
-        result = st.bidi_component("default_value_component", default=default_value)
-
-        # Verify the result has the correct structure
-        # Note: The default value is used when the widget hasn't been interacted with yet
-        # In the test environment, the widget state is typically None initially
-        assert hasattr(result, "value")
-        # The actual default value handling is done by the widget registration system
-
     def test_component_with_key(self):
         """Test component with a user-specified key."""
         # Register a component
@@ -231,10 +207,7 @@ class BidiComponentTest(DeltaGeneratorTestCase):
         )
 
         # Call the component with a key
-        result = st.bidi_component("keyed_component", key="my_key")
-
-        # Verify the result
-        assert hasattr(result, "value")
+        st.bidi_component("keyed_component", key="my_key")
 
         # Verify the proto was enqueued with the correct ID
         delta = self.get_delta_from_queue()
@@ -255,10 +228,7 @@ class BidiComponentTest(DeltaGeneratorTestCase):
 
         # Call the component with data
         test_data = {"message": "hello", "count": 42}
-        result = st.bidi_component("data_component", data=test_data)
-
-        # Verify the result
-        assert hasattr(result, "value")
+        st.bidi_component("data_component", data=test_data)
 
         # Verify the proto was enqueued with the data
         delta = self.get_delta_from_queue()
@@ -289,7 +259,7 @@ class BidiComponentTest(DeltaGeneratorTestCase):
         )
 
         # Verify the result
-        assert hasattr(result, "value")
+        assert hasattr(result, "click")
 
         # Verify the proto was enqueued with registered handler names
         delta = self.get_delta_from_queue()
@@ -298,28 +268,6 @@ class BidiComponentTest(DeltaGeneratorTestCase):
         # Should have the click handler registered via trigger widget mechanism
         handler_names = list(bidi_component_proto.registered_handler_names)
         assert "click" in handler_names
-
-    def test_component_with_child_containers(self):
-        """Test component with child containers."""
-        # Register a component
-        self.mock_registry.register(
-            BidiComponentDefinition(
-                name="container_component",
-                js="console.log('hello world');",
-            )
-        )
-
-        # Call the component with child containers
-        result = st.bidi_component("container_component", child_container_count=3)
-
-        # Verify the result
-        assert hasattr(result, "value")
-
-        # Verify the proto was enqueued with the correct child container count
-        delta = self.get_delta_from_queue()
-        bidi_component_proto = delta.new_element.bidi_component
-        assert bidi_component_proto.component_name == "container_component"
-        assert bidi_component_proto.child_container_count == 3
 
     def test_component_without_script_context_returns_default(self):
         """Test component behavior when there's no script run context."""
