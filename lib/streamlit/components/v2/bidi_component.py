@@ -201,7 +201,6 @@ class BidiComponentMixin:
         component_name: str,
         *args: Any,
         key: str | None = None,
-        child_container_count: int | None = None,
         # TODO: This needs to have a better type + support Arrow
         data: Any | None = None,
         **kwargs: WidgetCallback | None,
@@ -219,8 +218,6 @@ class BidiComponentMixin:
             An optional string to use as the unique key for the component.
             If this is omitted, a key will be generated based on the
             component's execution sequence.
-        child_container_count : int
-            The number of child containers this component has. Default is 0.
         **kwargs
             Keyword arguments to pass to the component.
 
@@ -310,7 +307,6 @@ class BidiComponentMixin:
         bidi_component_proto.isolate_styles = component_def.isolate_styles
         # TODO: Support dataframes via Arrow
         bidi_component_proto.data = json.dumps(data) if data else ""
-        bidi_component_proto.child_container_count = child_container_count or 0
         bidi_component_proto.form_id = current_form_id(self.dg)
         if callbacks_by_event:
             bidi_component_proto.registered_handler_names.extend(
