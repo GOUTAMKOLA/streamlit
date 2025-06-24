@@ -12,12 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import TYPE_CHECKING
 
 import streamlit as st
-
-if TYPE_CHECKING:
-    from streamlit.components.v2.bidi_component import BidiComponentState
+from streamlit.components.v2.bidi_component import BidiComponentResult
 
 st.header("Bidi Component Trigger Reset Test")
 
@@ -40,7 +37,7 @@ if "bidi_click_count" not in st.session_state:
     st.session_state.bidi_click_count = 0
 
 
-def my_bidi_component() -> "BidiComponentState":
+def my_bidi_component() -> BidiComponentResult:
     """A simple bidi component that supports both change and click events."""
 
     js_code = """

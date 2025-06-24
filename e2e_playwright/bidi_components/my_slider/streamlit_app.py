@@ -14,12 +14,13 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 import streamlit as st
 
 if TYPE_CHECKING:
-    from streamlit.components.v2.bidi_component import BidiComponentState
+    from streamlit.components.v2.bidi_component import BidiComponentResult
+    from streamlit.runtime.state.common import WidgetCallback
 
 st.header("Custom slider component (no JS framework)")
 
@@ -36,9 +37,9 @@ with st.echo():
         min: int = 0,
         max: int = 100,
         value: int | None = None,
-        callback: Callable | None = None,
+        callback: WidgetCallback | None = None,
         key: str | None = None,
-    ) -> BidiComponentState:
+    ) -> BidiComponentResult:
         component_name = "sliderComponent"
 
         if value is None:

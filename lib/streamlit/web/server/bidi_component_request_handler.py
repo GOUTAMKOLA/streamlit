@@ -30,7 +30,7 @@ _LOGGER: Final = get_logger(__name__)
 
 
 class BidiComponentRequestHandler(tornado.web.RequestHandler):
-    def initialize(self, registry: BidiComponentRegistry):
+    def initialize(self, registry: BidiComponentRegistry) -> None:
         self._registry = registry
 
     def get(self, path: str) -> None:

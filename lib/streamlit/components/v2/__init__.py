@@ -26,10 +26,11 @@ if TYPE_CHECKING:
     from pathlib import Path
     from types import FrameType
 
-    from streamlit.components.v2.bidi_component import BidiComponentState
+    from streamlit.components.v2.bidi_component import BidiComponentResult
     from streamlit.runtime.state.common import WidgetCallback
 
 
+# TODO: Move this
 def parse_callbacks(**kwargs: Any) -> dict[str, WidgetCallback]:
     """Parse on_* keyword arguments into event callbacks.
 
@@ -60,10 +61,9 @@ def component(
     js: str | Path | None = None,
     isolate_styles: bool = True,
     key: str | None = None,
-    default: Any = None,
     data: Any | None = None,
-    **on_callbacks: WidgetCallback,
-) -> BidiComponentState:
+    **on_callbacks: WidgetCallback | None,
+) -> BidiComponentResult:
     """Register and render a bidirectional component immediately.
 
     Parameters
@@ -80,8 +80,6 @@ def component(
         Whether to isolate styles for the component. Defaults to True.
     key : str or None
         An optional string to use as the unique key for the component.
-    default : Any or None
-        The default return value for the component.
     data : Any or None
         Data to pass to the component (JSON-serializable).
     **on_callbacks : WidgetCallback
@@ -90,7 +88,7 @@ def component(
 
     Returns
     -------
-    BidiComponentState
+    BidiComponentResult
         A dictionary-like object representing the component's state.
     """
     import streamlit as st
@@ -121,7 +119,6 @@ def component(
     return st.bidi_component(
         name,
         key=key,
-        default=default,
         data=data,
-        **on_callbacks,
+        **on_callbacks,  # type: ignore[arg-type]
     )

@@ -143,8 +143,7 @@ class BidiComponentResult(AttributeDictionary):
         """Return the :class:`~streamlit.delta_generator.DeltaGenerator` that
         rendered this component.
         """
-
-        return self["delta_generator"]
+        return cast("DeltaGenerator", self["delta_generator"])
 
 
 @dataclass
@@ -154,7 +153,7 @@ class BidiComponentSerde:
     Assumes communication via JSON strings.
     """
 
-    def deserialize(self, ui_value: str | dict | None) -> BidiComponentState:
+    def deserialize(self, ui_value: str | dict[str, Any] | None) -> BidiComponentState:
         """Deserialize the state from the frontend.
 
         Args:
@@ -168,10 +167,7 @@ class BidiComponentSerde:
             if isinstance(ui_value, dict):
                 deserialized_value = ui_value
             elif ui_value is not None:
-                if isinstance(ui_value, (int, float, bool)):
-                    deserialized_value = ui_value
-                else:
-                    deserialized_value = json.loads(ui_value)
+                deserialized_value = json.loads(ui_value)
             else:
                 deserialized_value = None
         except Exception:
@@ -205,11 +201,10 @@ class BidiComponentMixin:
         component_name: str,
         *args: Any,
         key: str | None = None,
-        default: Any = None,
-        child_container_count: int = 0,
+        child_container_count: int | None = None,
         # TODO: This needs to have a better type + support Arrow
         data: Any | None = None,
-        **kwargs: Any,
+        **kwargs: WidgetCallback | None,
     ) -> BidiComponentResult:
         """Add a bidirectional component instance to the app using a registered component.
 
@@ -224,9 +219,6 @@ class BidiComponentMixin:
             An optional string to use as the unique key for the component.
             If this is omitted, a key will be generated based on the
             component's execution sequence.
-        default: any or None
-            The default return value for the component. This is returned when
-            the component's frontend hasn't yet specified a value.
         child_container_count : int
             The number of child containers this component has. Default is 0.
         **kwargs
@@ -252,8 +244,8 @@ class BidiComponentMixin:
 
         if ctx is None:
             # Create an empty state with the default value and return it
-            state: BidiComponentState = {"value": default}
-            return BidiComponentResult(self.dg, state, {})
+            state: BidiComponentState = {"value": None}
+            return BidiComponentResult(self.dg, state.get("value", {}), {})
 
         # Get the component definition from the registry
         from streamlit.runtime import Runtime
@@ -318,7 +310,7 @@ class BidiComponentMixin:
         bidi_component_proto.isolate_styles = component_def.isolate_styles
         # TODO: Support dataframes via Arrow
         bidi_component_proto.data = json.dumps(data) if data else ""
-        bidi_component_proto.child_container_count = child_container_count
+        bidi_component_proto.child_container_count = child_container_count or 0
         bidi_component_proto.form_id = current_form_id(self.dg)
         if callbacks_by_event:
             bidi_component_proto.registered_handler_names.extend(
@@ -460,7 +452,7 @@ class BidiComponentMixin:
                 deserializer=lambda s: json.loads(s) if s else None,
                 serializer=lambda v: json.dumps(v),
                 ctx=ctx,
-                callbacks={"change": evt_cb} if evt_cb else None,
+                callbacks={"change": evt_cb} if evt_cb is not None else None,
                 value_type="json_trigger_value",
             )
 

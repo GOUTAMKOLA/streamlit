@@ -96,6 +96,7 @@ ValueFieldName: TypeAlias = Literal[
     "trigger_value",
     "string_trigger_value",
     "chat_input_value",
+    "json_trigger_value",
 ]
 
 

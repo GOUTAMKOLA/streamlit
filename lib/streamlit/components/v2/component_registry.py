@@ -82,7 +82,7 @@ class BidiComponentDefinition:
     _is_js_path: bool = field(default=False, init=False, repr=False)
     _source_paths: dict[str, str] = field(default_factory=dict, init=False, repr=False)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         # Keep track of source paths for content loaded from files
         source_paths = {}
 
@@ -233,7 +233,7 @@ class BidiComponentDefinition:
 class BidiComponentRegistry:
     """Registry for bidirectional components V2."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         # TODO: Consider thread-safety implications more deeply if components
         # can be registered during runtime from different threads, though
         # typical usage might be mostly at import time. Using a lock for now.

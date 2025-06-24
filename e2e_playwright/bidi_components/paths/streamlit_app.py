@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Callable
 import streamlit as st
 
 if TYPE_CHECKING:
-    from streamlit.components.v2.bidi_component import BidiComponentState
+    from streamlit.components.v2.bidi_component import BidiComponentResult
 
 with st.echo():
     HTML_FORM = """
@@ -40,7 +40,7 @@ with st.echo():
         html: str | None = None,
         css: str | Path | None = None,
         on_change: Callable[[], None] | None = None,
-    ) -> BidiComponentState:
+    ) -> BidiComponentResult:
         out = st.components.v2.component(
             name="my_component",
             html=html,

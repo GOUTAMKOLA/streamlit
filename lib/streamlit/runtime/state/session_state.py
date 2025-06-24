@@ -22,7 +22,6 @@ from dataclasses import dataclass, field, replace
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     Final,
     Union,
     cast,
@@ -580,6 +579,7 @@ class SessionState:
         trigger_value is set.
         """
         from streamlit.runtime.scriptrunner import RerunException
+        from streamlit.runtime.state.common import WidgetCallback
 
         # Iterate over a copy of keys in case callbacks modify underlying collections.
         widget_ids_to_process = list(self._new_widget_state.states.keys())
@@ -594,11 +594,11 @@ class SessionState:
 
             # Helper to execute a callback with fragment context handling
             def execute_callback(
-                callback_fn: Callable,
+                callback_fn: WidgetCallback,
                 metadata: WidgetMetadata[Any],
                 metadata_args: tuple[Any, ...],
                 metadata_kwargs: dict[str, Any],
-            ):
+            ) -> None:
                 ctx = get_script_run_ctx()
                 if ctx and metadata.fragment_id is not None:
                     ctx.in_fragment_callback = True

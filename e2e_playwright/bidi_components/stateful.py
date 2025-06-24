@@ -13,12 +13,13 @@
 # limitations under the License.
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 import streamlit as st
 
 if TYPE_CHECKING:
-    from streamlit.components.v2.bidi_component import BidiComponentState
+    from streamlit.components.v2.bidi_component import BidiComponentResult
+    from streamlit.runtime.state.common import WidgetCallback
 
 st.header("Bidi Component")
 
@@ -64,9 +65,9 @@ def my_component(
     *,
     key: str | None = None,
     data: Any | None = None,
-    on_range_change: Callable | None = None,
-    on_text_change: Callable | None = None,
-) -> BidiComponentState:
+    on_range_change: WidgetCallback | None = None,
+    on_text_change: WidgetCallback | None = None,
+) -> BidiComponentResult:
     out = st.components.v2.component(
         name="my_component",
         js=JS_CODE,

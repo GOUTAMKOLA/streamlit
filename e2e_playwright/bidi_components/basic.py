@@ -14,12 +14,13 @@
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 import streamlit as st
 
 if TYPE_CHECKING:
-    from streamlit.components.v2.bidi_component import BidiComponentState
+    from streamlit.components.v2.bidi_component import BidiComponentResult
+    from streamlit.runtime.state.common import WidgetCallback
 
 st.header("Static icon component (inline, no JS framework)")
 
@@ -29,7 +30,7 @@ st.write(
 
 with st.echo():
 
-    def emoji_icon(emoji: str) -> BidiComponentState:
+    def emoji_icon(emoji: str) -> BidiComponentResult:
         component_name = "emojiIconComponent"
 
         out = st.components.v2.component(
@@ -64,7 +65,7 @@ st.write(
 
 with st.echo():
 
-    def emoji_icon(emoji: str) -> BidiComponentState:
+    def emoji_icon(emoji: str) -> BidiComponentResult:
         component_name = "emojiIconComponent2"
 
         out = st.components.v2.component(
@@ -160,9 +161,9 @@ div {
         *,
         key: str | None = None,
         data: Any | None = None,
-        on_change: Callable | None = None,
-        on_click: Callable | None = None,
-    ) -> BidiComponentState:
+        on_change: WidgetCallback | None = None,
+        on_click: WidgetCallback | None = None,
+    ) -> BidiComponentResult:
         out = st.components.v2.component(
             name="my_component",
             js=JS_CODE,
