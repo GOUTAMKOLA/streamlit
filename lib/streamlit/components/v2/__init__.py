@@ -120,5 +120,8 @@ def component(
         name,
         key=key,
         data=data,
-        **on_callbacks,  # type: ignore[arg-type]
+        **on_callbacks,
     )
+
+
+__all__ = ["component"]
