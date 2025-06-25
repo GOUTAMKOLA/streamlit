@@ -84,22 +84,27 @@ def make_trigger_id(base: str, event: str) -> str:
     return f"{base}{EVENT_DELIM}{event}"
 
 
+# ----------------------------------------------------------------------
+# Public state typing
+# ----------------------------------------------------------------------
+
+
 class BidiComponentState(TypedDict, total=False):
     """
     The schema for the BidiComponent state.
 
-    The state is stored in a dictionary-like object that supports both
-    key and attribute notation. States cannot be programmatically changed
-    or set through Session State.
+    The state is stored in a dictionary-like object that supports both key and
+    attribute notation. States cannot be programmatically changed or set through
+    Session State.
 
     Attributes
     ----------
-    value : Any
+    value : dict[str, Any]
         The current value of the component instance returned from the frontend,
         or the default value if not yet set.
     """
 
-    value: Any
+    value: dict[str, Any]
 
 
 class BidiComponentResult(AttributeDictionary):
@@ -163,16 +168,23 @@ class BidiComponentSerde:
         -------
             The deserialized state wrapped in an AttributeDictionary.
         """
-        try:
-            if isinstance(ui_value, dict):
-                deserialized_value = ui_value
-            elif ui_value is not None:
-                deserialized_value = json.loads(ui_value)
-            else:
-                deserialized_value = None
-        except Exception:
-            # TODO: Should we raise an error here? Should we let the user know?
-            deserialized_value = None
+        # We always normalise the incoming JSON payload into a *dict*.
+        # Any failure to decode (or an unexpected non-mapping structure)
+        # results in an empty mapping so that the returned type adheres to
+        # :class:`BidiComponentState`.
+
+        deserialized_value: dict[str, Any]
+
+        if isinstance(ui_value, dict):
+            deserialized_value = ui_value
+        elif ui_value is not None:
+            try:
+                parsed = json.loads(ui_value)
+                deserialized_value = parsed if isinstance(parsed, dict) else {}
+            except Exception:
+                deserialized_value = {}
+        else:
+            deserialized_value = {}
 
         state: BidiComponentState = {"value": deserialized_value}
         return cast("BidiComponentState", AttributeDictionary(state))
@@ -187,8 +199,6 @@ class BidiComponentSerde:
         -------
             A JSON string representation of the value.
         """
-        # Frontend might expect a specific format; adjust as needed.
-        # Defaulting to JSON serialization.
         return json.dumps(value)
 
 
@@ -241,7 +251,7 @@ class BidiComponentMixin:
 
         if ctx is None:
             # Create an empty state with the default value and return it
-            state: BidiComponentState = {"value": None}
+            state: BidiComponentState = {"value": {}}
             return BidiComponentResult(self.dg, state.get("value", {}), {})
 
         # Get the component definition from the registry
@@ -363,18 +373,8 @@ class BidiComponentMixin:
                 # The component might have been removed in the meantime. Skip.
                 return
 
-            # `raw_val` may have the shape `{ "value": {...} }` due to the Serde
-            # wrapping. We want the *inner* mapping that contains the per-key
-            # state entries (e.g. "range", "text"). If the wrapping is missing,
-            # we assume the top-level mapping is already the state.
-            if isinstance(raw_val, dict) and "value" in raw_val and len(raw_val) == 1:
-                current_state_dict = (
-                    raw_val["value"] if isinstance(raw_val["value"], dict) else {}
-                )
-            elif isinstance(raw_val, dict):
-                current_state_dict = raw_val
-            else:
-                current_state_dict = {}
+            # Extract the *inner* mapping of the state.
+            current_state_dict = _unwrap_component_state(raw_val)
 
             # Determine which keys were added, removed or had their value
             # changed. We treat None vs missing as a change so that setting a
@@ -423,17 +423,7 @@ class BidiComponentMixin:
 
         _initial_raw_val = component_state.value  # AttributeDictionary or primitive
 
-        if (
-            isinstance(_initial_raw_val, dict)
-            and "value" in _initial_raw_val
-            and len(_initial_raw_val) == 1
-            and isinstance(_initial_raw_val["value"], dict)
-        ):
-            _prev_state = dict(_initial_raw_val["value"])
-        elif isinstance(_initial_raw_val, dict):
-            _prev_state = dict(_initial_raw_val)
-        else:
-            _prev_state = {}
+        _prev_state = _unwrap_component_state(_initial_raw_val)
 
         # ------------------------------------------------------------------
         # 3. Register *trigger* widgets - one per event
@@ -469,16 +459,51 @@ class BidiComponentMixin:
         # our Serde), but we defensively normalise it into a plain `dict` so
         # that users never observe AttributeDictionary instances nested inside
         # the result.
-        state_raw = component_state.value
-        if isinstance(state_raw, dict):
-            # Shallow-copy to avoid leaking references.
-            state_vals: dict[str, Any] = dict(state_raw)
-        else:
-            state_vals = {"value": state_raw}
+        state_vals = _unwrap_component_state(component_state.value)
 
-        return BidiComponentResult(self.dg, state_vals.get("value", {}), trigger_vals)
+        return BidiComponentResult(self.dg, state_vals, trigger_vals)
 
     @property
     def dg(self) -> DeltaGenerator:
         """Get our DeltaGenerator."""
         return cast("DeltaGenerator", self)
+
+
+# ----------------------------------------------------------------------
+# Internal helpers
+# ----------------------------------------------------------------------
+
+
+def _unwrap_component_state(raw_state: Any) -> dict[str, Any]:
+    """Return the inner mapping of a *valid* :class:`BidiComponentState`.
+
+    A valid component state **must** be a mapping that contains exactly one key:
+    ``"value"``, whose associated value is itself a mapping holding the actual
+    per-key state entries produced by the frontend.
+
+    Any other shape is considered invalid and will be treated as an empty
+    mapping. This strictness ensures we never silently accept malformed data
+    that could mask bugs elsewhere in the stack.
+
+    Parameters
+    ----------
+    raw_state : Any
+        The value retrieved from Session State.
+
+    Returns
+    -------
+    dict[str, Any]
+        The *inner* state mapping if the input adheres to the expected
+        structure, otherwise an empty ``dict``.
+    """
+
+    if (
+        isinstance(raw_state, dict)
+        and set(raw_state.keys()) == {"value"}
+        and isinstance(raw_state["value"], dict)
+    ):
+        # Shallow-copy to decouple from the original reference.
+        return dict(raw_state["value"])
+
+    # Any deviation from the expected schema is regarded as invalid.
+    return {}
