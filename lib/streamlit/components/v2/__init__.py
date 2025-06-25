@@ -30,29 +30,6 @@ if TYPE_CHECKING:
     from streamlit.runtime.state.common import WidgetCallback
 
 
-# TODO: Move this
-def parse_callbacks(**kwargs: Any) -> dict[str, WidgetCallback]:
-    """Parse on_* keyword arguments into event callbacks.
-
-    Parameters
-    ----------
-    **kwargs : Any
-        Keyword arguments that may contain callback functions
-
-    Returns
-    -------
-    dict[str, WidgetCallback]
-        Dictionary mapping event names to callback functions
-    """
-    callbacks = {}
-    for key, value in kwargs.items():
-        if key.startswith("on_") and key.endswith("_change") and callable(value):
-            event_name = key[3:-7]  # Remove "on_" prefix and "_change" suffix
-            if event_name:  # Ensure we have a valid event name
-                callbacks[event_name] = value
-    return callbacks
-
-
 def component(
     name: str,
     *,
