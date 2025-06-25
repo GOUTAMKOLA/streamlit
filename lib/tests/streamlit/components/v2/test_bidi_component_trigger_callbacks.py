@@ -15,9 +15,7 @@
 """Unit tests for *trigger* behaviour in ``st.bidi_component``.
 
 The tests below focus on verifying that *per-event* trigger callbacks are
-executed **exclusively** for the event whose value changed. They mirror the
-behavioural guarantees laid out in section *6 Multi-callback semantics* of the
-product plan documented in ``llm_docs/bidi_components_plan.md``.
+executed **exclusively** for the event whose value changed.
 """
 
 from __future__ import annotations
