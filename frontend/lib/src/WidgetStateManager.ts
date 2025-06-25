@@ -335,11 +335,30 @@ export class WidgetStateManager {
     source: Source,
     fragmentId: string | undefined
   ): void {
+    // ------------------------------------------------------------------
+    // ChatInput behaves like a trigger widget: its value should be sent to
+    // the backend exactly once and then be cleared so that subsequent
+    // reruns receive an "empty" value. With the introduction of batched
+    // trigger handling, we align ChatInput with the same mechanism used by
+    // `setTriggerValue` to avoid race conditions when multiple updates are
+    // emitted within the same macrotask.
+    // ------------------------------------------------------------------
+
+    // 1. Store the value in a temporary WidgetState proto.
     this.createWidgetState(widget, source).chatInputValue = new ChatInputValue(
       value
     )
-    this.onWidgetValueChanged(widget.formId, source, fragmentId)
-    this.deleteWidgetState(widget.id)
+
+    // 2. Mark this widget ID so that it is cleaned-up after the pending
+    //    batch flush. The `scheduleFlush` helper already takes care of
+    //    deleting all IDs present in `pendingTriggerIds` once the update
+    //    message has been sent.
+    this.pendingTriggerIds.add(widget.id)
+
+    // 3. Schedule (or reuse) a macrotask-level flush so that ChatInput
+    //    updates are coalesced with other trigger/value updates that happen
+    //    during the same event loop tick.
+    this.scheduleFlush(fragmentId)
   }
 
   /**
