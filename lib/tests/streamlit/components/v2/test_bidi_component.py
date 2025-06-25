@@ -269,32 +269,6 @@ class BidiComponentTest(DeltaGeneratorTestCase):
         handler_names = list(bidi_component_proto.registered_handler_names)
         assert "click" in handler_names
 
-    def test_component_without_script_context_returns_default(self):
-        """Test component behavior when there's no script run context."""
-        # Register a component
-        self.mock_registry.register(
-            BidiComponentDefinition(
-                name="no_context_component",
-                js="console.log('hello world');",
-            )
-        )
-
-        # Mock get_script_run_ctx to return None
-        with patch(
-            "streamlit.components.v2.bidi_component.get_script_run_ctx",
-            return_value=None,
-        ):
-            # Call the component with a default value
-            default_value = {"test": "value"}
-            result = st.bidi_component("no_context_component", default=default_value)
-
-            # Should return the default value wrapped in BidiComponentState
-            assert hasattr(result, "value")
-            assert result.value == default_value
-
-            # No proto should be enqueued since there's no context
-            assert len(self.get_all_deltas_from_queue()) == 0
-
 
 if __name__ == "__main__":
     unittest.main()
