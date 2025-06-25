@@ -37,23 +37,32 @@ export default function(component) {
     setTriggerValue("bar", true)
   }
 
+  const handleClickBoth = () => {
+    setTriggerValue("foo", true)
+    setTriggerValue("bar", true)
+  }
+
   const fooButton = parentElement.querySelector("#foo-button")
   const barButton = parentElement.querySelector("#bar-button")
+  const bothButton = parentElement.querySelector("#both-button")
 
   fooButton.addEventListener("click", handleClickFoo)
   barButton.addEventListener("click", handleClickBar)
+  bothButton.addEventListener("click", handleClickBoth)
 
   return () => {
     fooButton.removeEventListener("click", handleClickFoo)
     barButton.removeEventListener("click", handleClickBar)
+    bothButton.removeEventListener("click", handleClickBoth)
   }
 }
 """
 
 HTML_CODE = """
 <div>
-<button id="foo-button">Click foo</button>
-<button id="bar-button">Click bar</button>
+    <button id="foo-button">Trigger foo</button>
+    <button id="bar-button">Trigger bar</button>
+    <button id="both-button">Trigger both</button>
 </div>
 """
 
@@ -92,13 +101,11 @@ if "last_on_bar_change_processed" not in st.session_state:
 
 
 def handle_foo_change():
-    print("Clicked")
     st.session_state.foo_count += 1
     st.session_state.last_on_foo_change_processed = time.strftime("%H:%M:%S")
 
 
 def handle_bar_change():
-    print("Clicked 2")
     st.session_state.bar_count += 1
     st.session_state.last_on_bar_change_processed = time.strftime("%H:%M:%S")
 
