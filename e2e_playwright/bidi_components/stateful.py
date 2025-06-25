@@ -25,12 +25,9 @@ st.header("Bidi Component")
 
 JS_CODE = """
 export default function(component) {
-  console.log("I am a bidi component", component)
-
   const { parentElement, setStateValue } = component
 
   const handleRangeChange = (event) => {
-  console.log("Range Changed")
     setStateValue("range", event.target.value)
   }
 
