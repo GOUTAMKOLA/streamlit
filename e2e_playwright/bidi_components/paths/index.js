@@ -15,17 +15,11 @@
  */
 
 export default function (component) {
-  console.log("I am a bidi component", component);
-
   const { parentElement } = component;
 
   const form = parentElement.querySelector("form");
   const handleSubmit = (event) => {
     event.preventDefault();
-    console.log("Form submitted with values", {
-      range: event.target.range.value,
-      text: event.target.text.value,
-    });
     alert(
       "Form submitted with values: " +
         JSON.stringify({
@@ -38,7 +32,6 @@ export default function (component) {
   form.addEventListener("submit", handleSubmit);
 
   return () => {
-    console.log("Cleaning up");
     form.removeEventListener("submit", handleSubmit);
   };
 }

@@ -107,8 +107,6 @@ st.header("Bidi Component")
 with st.echo():
     JS_CODE = """
 export default function(component) {
-  console.log("I am a bidi component", component)
-
   const { parentElement, setStateValue, setTriggerValue } = component
 
   const form = parentElement.querySelector("form")
@@ -118,7 +116,6 @@ export default function(component) {
       range: event.target.range.value,
       text: event.target.text.value,
     }
-    console.log("Form submitted with values", formValues)
     setStateValue("formValues", formValues)
   }
 
@@ -131,7 +128,6 @@ export default function(component) {
   parentElement.addEventListener("click", handleClick)
 
   return () => {
-    console.log("Cleaning up")
     form.removeEventListener("submit", handleSubmit)
     parentElement.removeEventListener("click", handleClick)
   }

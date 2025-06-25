@@ -44,7 +44,6 @@ export default function(component) {
   barButton.addEventListener("click", handleClickBar)
 
   return () => {
-    console.log("Cleaning up")
     fooButton.removeEventListener("click", handleClickFoo)
     barButton.removeEventListener("click", handleClickBar)
   }
