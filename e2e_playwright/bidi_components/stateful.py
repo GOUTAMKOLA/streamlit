@@ -103,7 +103,7 @@ st.write(f"Range change count: {st.session_state.range_change_count}")
 st.write(f"Text change count: {st.session_state.text_change_count}")
 
 
-is_clicked = st.button("Click me")
+is_clicked = st.button("st.button trigger")
 
 if is_clicked:
-    st.write("Button was clicked")
+    st.write("st.button was clicked")

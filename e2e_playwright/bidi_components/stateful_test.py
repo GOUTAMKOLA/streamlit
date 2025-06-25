@@ -54,3 +54,13 @@ def test_stateful_interactions(app: Page):
 
     expect(app.get_by_text("Range change count: 1")).to_be_visible()
     expect(app.get_by_text("Text change count: 1")).to_be_visible()
+
+    # Trigger a streamlit button to ensure the values are not reset
+    app.get_by_text("st.button trigger").click()
+    expect(
+        app.get_by_text(
+            "Result: {'delta_generator': DeltaGenerator(), 'range': '10', 'text': 'Hello'}"
+        )
+    ).to_be_visible()
+    expect(app.get_by_text("Range change count: 1")).to_be_visible()
+    expect(app.get_by_text("Text change count: 1")).to_be_visible()
