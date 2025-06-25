@@ -16,7 +16,6 @@
 
 // TODO: Expose this so that component authors can use it.
 export type StBidiComponentV2Args<DataShape = unknown, Value = unknown> = {
-  childContainerIDs: string[]
   data: DataShape
   name: string
   parentElement: HTMLElement | ShadowRoot

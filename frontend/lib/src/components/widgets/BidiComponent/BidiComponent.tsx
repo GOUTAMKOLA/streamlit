@@ -103,19 +103,17 @@ const loadAndRunModule = async <T extends Record<string, unknown>>({
 
   const setStateValue = <T extends Record<string, unknown>>(
     name: string,
-    value: T[keyof T]
+    value: unknown
   ): void => {
-    let newValue: T[keyof T]
+    let newValue: T = {} as T
 
     try {
       const existingValue = getWidgetValue()
 
-      // @ts-expect-error -- TODO: Fix this
-      newValue = { ...existingValue, [name]: value }
+      newValue = { ...existingValue, [name]: value } as T
     } catch (error) {
       LOG.error(`Failed to get existing value for ${name}`, error)
-      // @ts-expect-error -- TODO: Fix this
-      newValue = { [name]: value }
+      newValue = { [name]: value } as T
     }
 
     void widgetMgr.setJsonValue(
@@ -143,8 +141,6 @@ const loadAndRunModule = async <T extends Record<string, unknown>>({
     // that it is a reserved prop.
     stKey: componentId,
     parentElement,
-    // TODO: FIXME:
-    childContainerIDs: [],
     setStateValue,
     setTriggerValue,
   } satisfies StBidiComponentV2Args)
