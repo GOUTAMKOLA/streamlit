@@ -25,6 +25,12 @@ from streamlit.dataframe_util import (
     determine_data_format,
 )
 from streamlit.elements.lib.form_utils import current_form_id
+from streamlit.elements.lib.layout_utils import (
+    Height,
+    LayoutConfig,
+    Width,
+    validate_width,
+)
 from streamlit.elements.lib.policies import check_cache_replay_rules
 from streamlit.elements.lib.utils import compute_and_register_element_id, to_key
 from streamlit.errors import StreamlitAPIException
@@ -218,6 +224,8 @@ class BidiComponentMixin:
         key: str | None = None,
         # TODO: This needs to have a better type + support Arrow
         data: Any | None = None,
+        width: Width = "stretch",
+        height: Height = "content",
         **kwargs: WidgetCallback | None,
     ) -> BidiComponentResult:
         """Add a bidirectional component instance to the app using a registered component.
@@ -320,6 +328,9 @@ class BidiComponentMixin:
         bidi_component_proto.css_content = component_def.css_content or ""
         bidi_component_proto.css_source_path = component_def.css_url or ""
         bidi_component_proto.isolate_styles = component_def.isolate_styles
+
+        validate_width(width, allow_content=True)
+        layout_config = LayoutConfig(width=width, height=height)
 
         if data is not None:
             try:
@@ -487,7 +498,11 @@ class BidiComponentMixin:
         # ------------------------------------------------------------------
         # 4. Enqueue proto and assemble the result object
         # ------------------------------------------------------------------
-        self.dg._enqueue(INTERNAL_COMPONENT_NAME, bidi_component_proto)
+        self.dg._enqueue(
+            INTERNAL_COMPONENT_NAME,
+            bidi_component_proto,
+            layout_config=layout_config,
+        )
 
         # `component_state.value` is expected to be a mapping-like object (via
         # our Serde), but we defensively normalise it into a plain `dict` so

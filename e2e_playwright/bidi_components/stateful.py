@@ -19,6 +19,7 @@ import streamlit as st
 
 if TYPE_CHECKING:
     from streamlit.components.v2.bidi_component import BidiComponentResult
+    from streamlit.elements.lib.layout_utils import Height, Width
     from streamlit.runtime.state.common import WidgetCallback
 
 st.header("Bidi Component")
@@ -64,6 +65,8 @@ def my_component(
     data: Any | None = None,
     on_range_change: WidgetCallback | None = None,
     on_text_change: WidgetCallback | None = None,
+    width: Width | None = None,
+    height: Height | None = None,
 ) -> BidiComponentResult:
     out = st.components.v2.component(
         name="my_component",
@@ -74,6 +77,8 @@ def my_component(
         data=data,
         on_range_change=on_range_change,
         on_text_change=on_text_change,
+        width=width,
+        height=height,
     )
     return out
 
