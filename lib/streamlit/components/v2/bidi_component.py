@@ -318,10 +318,6 @@ class BidiComponentMixin:
         # TODO: Support dataframes via Arrow
         bidi_component_proto.data = json.dumps(data) if data else ""
         bidi_component_proto.form_id = current_form_id(self.dg)
-        if callbacks_by_event:
-            bidi_component_proto.registered_handler_names.extend(
-                callbacks_by_event.keys()
-            )
 
         # Instantiate the Serde for this component instance
         serde = BidiComponentSerde()

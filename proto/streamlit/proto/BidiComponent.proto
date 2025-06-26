@@ -59,6 +59,4 @@ message BidiComponent {
     // Additional, non-JSON args. These require special processing
     // on the other end.
     // repeated BidiComponentData special_args = 9;
-    // The names of the event handlers registered in Python (e.g., "change", "click").
-    repeated string registered_handler_names = 11;
 }

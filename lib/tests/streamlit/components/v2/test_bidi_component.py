@@ -265,9 +265,6 @@ class BidiComponentTest(DeltaGeneratorTestCase):
         delta = self.get_delta_from_queue()
         bidi_component_proto = delta.new_element.bidi_component
         assert bidi_component_proto.component_name == "callback_component"
-        # Should have the click handler registered via trigger widget mechanism
-        handler_names = list(bidi_component_proto.registered_handler_names)
-        assert "click" in handler_names
 
 
 if __name__ == "__main__":
