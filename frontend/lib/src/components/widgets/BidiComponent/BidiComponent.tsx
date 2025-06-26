@@ -34,6 +34,7 @@ import type { WidgetStateManager } from "~lib/WidgetStateManager"
 import ErrorElement from "~lib/components/shared/ErrorElement"
 import { useRequiredContext } from "~lib/hooks/useRequiredContext"
 import { LibContext } from "~lib/components/core/LibContext"
+import { assertNever } from "~lib/util/assertNever"
 
 import { makeTriggerId } from "./idBuilder"
 import {
@@ -486,6 +487,9 @@ const BidiComponent: FC<BidiComponentProps> = ({
     cssContent,
     cssSourcePath,
     data,
+    json,
+    arrow,
+    bytes,
     htmlContent,
     id,
     isolateStyles,
@@ -498,12 +502,29 @@ const BidiComponent: FC<BidiComponentProps> = ({
     return value ? JSON.parse(value) : {}
   }, [element, widgetMgr])
 
+  const parsedData = useMemo(() => {
+    switch (data) {
+      case "json":
+        return json ? JSON.parse(json) : null
+      case "arrow":
+        return arrow?.data || null
+      case "bytes":
+        return bytes || null
+      case undefined:
+        return null
+      default:
+        assertNever(data)
+    }
+
+    return undefined
+  }, [data, json, arrow, bytes])
+
   const contextValue = useMemo<BidiComponentContextShape>(() => {
     return {
       componentName,
       cssContent: cssContent?.trim(),
       cssSourcePath: cssSourcePath || undefined,
-      data: data ? JSON.parse(data) : undefined,
+      data: parsedData,
       fragmentId,
       getWidgetValue,
       htmlContent: htmlContent?.trim(),
@@ -516,7 +537,6 @@ const BidiComponent: FC<BidiComponentProps> = ({
     componentName,
     cssContent,
     cssSourcePath,
-    data,
     fragmentId,
     getWidgetValue,
     htmlContent,
@@ -524,6 +544,7 @@ const BidiComponent: FC<BidiComponentProps> = ({
     jsContent,
     jsSourcePath,
     widgetMgr,
+    parsedData,
   ])
 
   return (

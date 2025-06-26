@@ -540,7 +540,6 @@ const RawElementNodeRenderer = (
         />
       )
     }
-
     case "componentInstance":
       return (
         <ComponentInstance

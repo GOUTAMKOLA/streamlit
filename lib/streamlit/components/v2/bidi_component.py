@@ -18,12 +18,16 @@ import json
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Final, TypedDict, cast
 
+from streamlit.dataframe_util import (
+    DataFormat,
+    convert_anything_to_arrow_bytes,
+    determine_data_format,
+)
 from streamlit.elements.lib.form_utils import current_form_id
 from streamlit.elements.lib.policies import check_cache_replay_rules
 from streamlit.elements.lib.utils import compute_and_register_element_id, to_key
 from streamlit.errors import StreamlitAPIException
-
-# Assuming protos are compiled and BidiComponentInstance is available:
+from streamlit.proto.Arrow_pb2 import Arrow as ArrowProto
 from streamlit.proto.BidiComponent_pb2 import BidiComponent as BidiComponentProto
 from streamlit.runtime.metrics_util import gather_metrics
 from streamlit.runtime.scriptrunner_utils.script_run_context import get_script_run_ctx
@@ -315,8 +319,46 @@ class BidiComponentMixin:
         bidi_component_proto.css_content = component_def.css_content or ""
         bidi_component_proto.css_source_path = component_def.css_url or ""
         bidi_component_proto.isolate_styles = component_def.isolate_styles
-        # TODO: Support dataframes via Arrow
-        bidi_component_proto.data = json.dumps(data) if data else ""
+
+        # --------------------------------------------------------------
+        # Handle the optional ``data`` parameter.
+        #
+        # We now support a *single* unified `data` payload via a `oneof` that
+        # can carry JSON strings, Arrow IPC bytes, or arbitrary byte buffers.
+        #
+        # The strategy is as follows:
+        # 1. Attempt to serialise dataframe-like structures to Arrow. If this
+        #    succeeds we populate the `arrow` field.
+        # 2. If the input is a raw `bytes` / `bytearray` payload we forward it
+        #    as-is via the dedicated `bytes` field.
+        # 3. Fallback: JSON-serialise everything else and store it in the
+        #    `json` field.
+        # --------------------------------------------------------------
+
+        if data is not None:
+            try:
+                # Prefer Arrow whenever the input looks like a dataframe.
+                data_format = determine_data_format(data)
+                if data_format != DataFormat.UNKNOWN:
+                    arrow_bytes = convert_anything_to_arrow_bytes(data)
+
+                    arrow_proto = ArrowProto()
+                    arrow_proto.data = arrow_bytes
+
+                    bidi_component_proto.arrow.CopyFrom(arrow_proto)
+                elif isinstance(data, (bytes, bytearray)):
+                    bidi_component_proto.bytes = bytes(data)
+                else:
+                    bidi_component_proto.json = json.dumps(data)
+            except Exception:
+                # As a last resort attempt JSON serialisation so that we don't
+                # silently drop developer data.
+                try:
+                    bidi_component_proto.json = json.dumps(data)
+                except Exception:
+                    raise StreamlitAPIException(
+                        "BidiComponent was unable to serialise the provided ``data``."
+                    )
         bidi_component_proto.form_id = current_form_id(self.dg)
 
         # Instantiate the Serde for this component instance

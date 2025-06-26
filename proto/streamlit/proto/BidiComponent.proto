@@ -21,16 +21,6 @@ option java_outer_classname = "BidiComponentProto";
 
 import "streamlit/proto/Arrow.proto";
 
-// TODO: Support dataframes via Arrow
-message BidiComponentData {
-  string key = 1;
-
-  oneof value {
-    Arrow arrow = 2;
-    bytes bytes = 3;
-  }
-}
-
 // Represents an instance of a bidirectional component.
 message BidiComponent {
     // The ID of the widget instance.
@@ -51,12 +41,16 @@ message BidiComponent {
     optional string css_source_path = 8;
     // Whether to isolate styles from the parent.
     bool isolate_styles = 9;
-    // The JSON value of the component's state.
-    // NOTE: This will be extended in future phases to support differentiation
-    // between state values (persistent) and trigger values (reset on rerun).
-    string data = 10;
-    // TODO: Support dataframes via Arrow
-    // Additional, non-JSON args. These require special processing
-    // on the other end.
-    // repeated BidiComponentData special_args = 9;
+    // The component's data payload. Exactly one of the following fields
+    // will be set at any given time.
+    oneof data {
+      // JSON-serialised value for generic data payloads.
+      string json = 10;
+
+      // Apache Arrow representation for dataframe-like payloads.
+      Arrow arrow = 11;
+
+      // Arbitrary bytes payload.
+      bytes bytes = 12;
+    }
 }
