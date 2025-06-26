@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from types import FrameType
 
     from streamlit.components.v2.bidi_component import BidiComponentResult
+    from streamlit.elements.lib.layout_utils import Height, Width
     from streamlit.runtime.state.common import WidgetCallback
 
 
@@ -39,6 +40,8 @@ def component(
     isolate_styles: bool = True,
     key: str | None = None,
     data: Any | None = None,
+    width: Width = "stretch",
+    height: Height = "content",
     **on_callbacks: WidgetCallback | None,
 ) -> BidiComponentResult:
     """Register and render a bidirectional component immediately.
@@ -97,6 +100,8 @@ def component(
         name,
         key=key,
         data=data,
+        width=width,
+        height=height,
         **on_callbacks,
     )
 

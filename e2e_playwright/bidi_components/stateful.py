@@ -65,8 +65,8 @@ def my_component(
     data: Any | None = None,
     on_range_change: WidgetCallback | None = None,
     on_text_change: WidgetCallback | None = None,
-    width: Width | None = None,
-    height: Height | None = None,
+    width: Width = "stretch",
+    height: Height = "content",
 ) -> BidiComponentResult:
     out = st.components.v2.component(
         name="my_component",
