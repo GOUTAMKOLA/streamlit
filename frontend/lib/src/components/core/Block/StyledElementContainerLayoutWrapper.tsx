@@ -68,7 +68,7 @@ export const StyledElementContainerLayoutWrapper: FC<
     }
 
     return {}
-  }, [node.element.type])
+  }, [node.element.type, isInSidebar])
 
   const styles = useLayoutStyles({
     element: node.element,
