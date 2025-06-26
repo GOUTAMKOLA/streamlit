@@ -254,36 +254,6 @@ class WStates(MutableMapping[str, Any]):
         ]
         return cast("list[WidgetStateProto]", states)
 
-    def call_callback(self, widget_id: str) -> None:
-        """Call the given widget's callback and return the callback's
-        return value. If the widget has no callback, return None.
-
-        If the widget doesn't exist, raise an Exception.
-        """
-        metadata = self.widget_metadata.get(widget_id)
-
-        if metadata is None:
-            raise RuntimeError(f"Widget {widget_id} not found.")
-
-        # Retrieve the 'change' callback specifically
-        change_callback = None
-        if metadata.callbacks and "change" in metadata.callbacks:
-            change_callback = metadata.callbacks["change"]
-
-        if change_callback is None:
-            return
-
-        args = metadata.callback_args or ()
-        kwargs = metadata.callback_kwargs or {}
-
-        ctx = get_script_run_ctx()
-        if ctx and metadata.fragment_id is not None:
-            ctx.in_fragment_callback = True
-            change_callback(*args, **kwargs)
-            ctx.in_fragment_callback = False
-        else:
-            change_callback(*args, **kwargs)
-
 
 def _missing_key_error_message(key: str) -> str:
     return (
