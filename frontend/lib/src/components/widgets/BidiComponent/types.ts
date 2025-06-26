@@ -22,6 +22,8 @@
  */
 export type BidiComponentState = Record<string, unknown>
 
+export type ArrowData = Uint8Array<ArrayBufferLike> | null
+
 // TODO: Expose this so that component authors can use it.
 export type StV2ComponentArgs<
   ComponentState extends BidiComponentState = BidiComponentState,
@@ -37,11 +39,11 @@ export type StV2ComponentArgs<
   name: string
   parentElement: HTMLElement | ShadowRoot
   setStateValue: (
-    name: string,
+    name: keyof ComponentState,
     value: ComponentState[keyof ComponentState]
   ) => void
   setTriggerValue: (
-    name: string,
+    name: keyof ComponentState,
     value: ComponentState[keyof ComponentState]
   ) => void
   stKey: string
