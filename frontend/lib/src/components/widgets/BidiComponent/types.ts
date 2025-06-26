@@ -14,13 +14,36 @@
  * limitations under the License.
  */
 
+/**
+ * The base type of the returned state from a Bidi Component.
+ * Users can extend this type to add their own state key/value pairs.
+ *
+ * @see BidiComponentState in lib/streamlit/components/v2/bidi_component.py
+ */
+export type BidiComponentState = Record<string, unknown>
+
 // TODO: Expose this so that component authors can use it.
-export type StBidiComponentV2Args<DataShape = unknown, Value = unknown> = {
+export type StV2ComponentArgs<
+  ComponentState extends BidiComponentState = BidiComponentState,
+  /**
+   * The shape of the data passed to the component.
+   * Users should provide this type for type safety.
+   *
+   * @see st.bidi_component in lib/streamlit/components/v2/__init__.py
+   */
+  DataShape = unknown,
+> = {
   data: DataShape
   name: string
   parentElement: HTMLElement | ShadowRoot
-  setStateValue: (name: string, value: Value) => void
-  setTriggerValue: (name: string, value: Value) => void
+  setStateValue: (
+    name: string,
+    value: ComponentState[keyof ComponentState]
+  ) => void
+  setTriggerValue: (
+    name: string,
+    value: ComponentState[keyof ComponentState]
+  ) => void
   stKey: string
 }
 

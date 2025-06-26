@@ -40,7 +40,11 @@ import {
   BidiComponentContext,
   BidiComponentContextShape,
 } from "./BidiComponentContext"
-import type { ComponentResult, StBidiComponentV2Args } from "./types"
+import type {
+  BidiComponentState,
+  ComponentResult,
+  StV2ComponentArgs,
+} from "./types"
 
 //#region Utility functions
 const LOG = getLogger("BidiComponent")
@@ -70,7 +74,7 @@ const handleError = (
   setError(normalizedError)
 }
 
-const loadAndRunModule = async <T extends Record<string, unknown>>({
+const loadAndRunModule = async <T extends BidiComponentState>({
   componentId,
   componentIdForWidgetMgr,
   componentName,
@@ -101,9 +105,9 @@ const loadAndRunModule = async <T extends Record<string, unknown>>({
     throw new Error("JS module does not have a default export function.")
   }
 
-  const setStateValue = <T extends Record<string, unknown>>(
+  const setStateValue = <T extends BidiComponentState>(
     name: string,
-    value: unknown
+    value: T[keyof T]
   ): void => {
     let newValue: T = {} as T
 
@@ -124,7 +128,10 @@ const loadAndRunModule = async <T extends Record<string, unknown>>({
     )
   }
 
-  const setTriggerValue = (name: string, value: unknown): void => {
+  const setTriggerValue = <T extends BidiComponentState>(
+    name: string,
+    value: T[keyof T]
+  ): void => {
     const triggerId = makeTriggerId(componentIdForWidgetMgr, name)
     void widgetMgr.setTriggerValue(
       { id: triggerId },
@@ -143,7 +150,7 @@ const loadAndRunModule = async <T extends Record<string, unknown>>({
     parentElement,
     setStateValue,
     setTriggerValue,
-  } satisfies StBidiComponentV2Args)
+  } satisfies StV2ComponentArgs)
 
   return {
     cleanup: typeof cleanup === "function" ? cleanup : undefined,
@@ -286,8 +293,6 @@ const useHandleJsContent = ({
     let cleanup: ComponentResult["cleanup"]
     let scriptElement: HTMLScriptElement | undefined
 
-    const parsedData = data ? JSON.parse(data) : null
-
     const run = async (): Promise<void> => {
       try {
         // Handle inline JS content
@@ -300,7 +305,7 @@ const useHandleJsContent = ({
             componentId,
             componentIdForWidgetMgr: id,
             componentName,
-            data: parsedData,
+            data,
             fragmentId,
             getWidgetValue,
             moduleUrl: dataUri,
@@ -334,7 +339,7 @@ const useHandleJsContent = ({
               componentId,
               componentIdForWidgetMgr: id,
               componentName,
-              data: parsedData,
+              data,
               fragmentId,
               getWidgetValue,
               moduleUrl: scriptUrl,
@@ -493,14 +498,12 @@ const BidiComponent: FC<BidiComponentProps> = ({
     return value ? JSON.parse(value) : {}
   }, [element, widgetMgr])
 
-  const contextValue = useMemo<
-    BidiComponentContextShape<Record<string, unknown>>
-  >(() => {
+  const contextValue = useMemo<BidiComponentContextShape>(() => {
     return {
       componentName,
       cssContent: cssContent?.trim(),
       cssSourcePath: cssSourcePath || undefined,
-      data: data || undefined,
+      data: data ? JSON.parse(data) : undefined,
       fragmentId,
       getWidgetValue,
       htmlContent: htmlContent?.trim(),

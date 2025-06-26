@@ -18,13 +18,18 @@ import { createContext } from "react"
 
 import { WidgetStateManager } from "~lib/WidgetStateManager"
 
-export type BidiComponentContextShape<T extends Record<string, unknown>> = {
+import { BidiComponentState } from "./types"
+
+export type BidiComponentContextShape<
+  ComponentState extends BidiComponentState = BidiComponentState,
+  DataShape = unknown,
+> = {
   componentName: string
   cssContent: string | undefined
   cssSourcePath: string | undefined
-  data: string | undefined
+  data: DataShape
   fragmentId: string | undefined
-  getWidgetValue: () => T
+  getWidgetValue: () => ComponentState
   htmlContent: string | undefined
   id: string
   jsContent: string | undefined
@@ -32,7 +37,6 @@ export type BidiComponentContextShape<T extends Record<string, unknown>> = {
   widgetMgr: WidgetStateManager
 }
 
-export const BidiComponentContext = createContext<BidiComponentContextShape<
-  Record<string, unknown>
-> | null>(null)
+export const BidiComponentContext =
+  createContext<BidiComponentContextShape | null>(null)
 BidiComponentContext.displayName = "BidiComponentContext"
