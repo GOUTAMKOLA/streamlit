@@ -216,8 +216,8 @@ class BidiComponentTest(DeltaGeneratorTestCase):
         # The ID should be deterministic based on the key
         assert bidi_component_proto.id is not None
 
-    def test_component_with_data(self):
-        """Test component with data parameter."""
+    def test_component_with_scalar_data(self):
+        """Test component with scalar data parameter serialized as JSON."""
         # Register a component
         self.mock_registry.register(
             BidiComponentDefinition(
@@ -226,18 +226,84 @@ class BidiComponentTest(DeltaGeneratorTestCase):
             )
         )
 
-        # Call the component with data
-        test_data = {"message": "hello", "count": 42}
+        # Use a simple scalar value which is treated as DataFormat.UNKNOWN and therefore JSON-encoded
+        test_data = "hello streamlit"
         st.bidi_component("data_component", data=test_data)
 
         # Verify the proto was enqueued with the data
         delta = self.get_delta_from_queue()
         bidi_component_proto = delta.new_element.bidi_component
         assert bidi_component_proto.component_name == "data_component"
-        # Data should be JSON serialized
+        # Data should be JSON serialized inside the `json` oneof field
+        assert bidi_component_proto.WhichOneof("data") == "json"
+        assert bidi_component_proto.json == '"hello streamlit"'
+
+    def test_component_with_dict_data_json(self):
+        """Test component with dict data serialized as JSON."""
+        # Register a component
+        self.mock_registry.register(
+            BidiComponentDefinition(
+                name="dict_data_component",
+                js="console.log('hello world');",
+            )
+        )
+
+        test_dict = {"message": "hello", "count": 42}
+        st.bidi_component("dict_data_component", data=test_dict)
+
+        delta = self.get_delta_from_queue()
+        proto = delta.new_element.bidi_component
+        assert proto.component_name == "dict_data_component"
+        # Should choose JSON path
+        assert proto.WhichOneof("data") == "json"
         import json
 
-        assert json.loads(bidi_component_proto.data) == test_data
+        assert json.loads(proto.json) == test_dict
+
+    def test_component_with_arrow_data(self):
+        """Test component with dataframe-like data serialised to Arrow."""
+        import pandas as pd
+
+        # Register a component
+        self.mock_registry.register(
+            BidiComponentDefinition(
+                name="arrow_data_component",
+                js="console.log('hello world');",
+            )
+        )
+
+        # Use a simple Pandas DataFrame which should be detected as dataframe-like
+        df = pd.DataFrame({"a": [1, 2, 3], "b": ["x", "y", "z"]})
+        st.bidi_component("arrow_data_component", data=df)
+
+        # Verify the proto was enqueued with Arrow data
+        delta = self.get_delta_from_queue()
+        bidi_component_proto = delta.new_element.bidi_component
+        assert bidi_component_proto.component_name == "arrow_data_component"
+        assert bidi_component_proto.WhichOneof("data") == "arrow"
+        # The Arrow bytes should be non-empty
+        assert len(bidi_component_proto.arrow.data) > 0
+
+    def test_component_with_bytes_data(self):
+        """Test component with raw bytes data passed through unchanged."""
+        # Register a component
+        self.mock_registry.register(
+            BidiComponentDefinition(
+                name="bytes_data_component",
+                js="console.log('hello world');",
+            )
+        )
+
+        # Raw bytes payload
+        binary_payload = b"\x00\x01\x02streamlit"
+        st.bidi_component("bytes_data_component", data=binary_payload)
+
+        # Verify the proto was enqueued with bytes data
+        delta = self.get_delta_from_queue()
+        bidi_component_proto = delta.new_element.bidi_component
+        assert bidi_component_proto.component_name == "bytes_data_component"
+        assert bidi_component_proto.WhichOneof("data") == "bytes"
+        assert bidi_component_proto.bytes == binary_payload
 
     def test_component_with_callbacks(self):
         """Test component with callback handlers."""

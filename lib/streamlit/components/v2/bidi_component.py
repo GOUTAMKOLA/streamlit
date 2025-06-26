@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Final, TypedDict, cast
 
@@ -320,38 +321,33 @@ class BidiComponentMixin:
         bidi_component_proto.css_source_path = component_def.css_url or ""
         bidi_component_proto.isolate_styles = component_def.isolate_styles
 
-        # --------------------------------------------------------------
-        # Handle the optional ``data`` parameter.
-        #
-        # We now support a *single* unified `data` payload via a `oneof` that
-        # can carry JSON strings, Arrow IPC bytes, or arbitrary byte buffers.
-        #
-        # The strategy is as follows:
-        # 1. Attempt to serialise dataframe-like structures to Arrow. If this
-        #    succeeds we populate the `arrow` field.
-        # 2. If the input is a raw `bytes` / `bytearray` payload we forward it
-        #    as-is via the dedicated `bytes` field.
-        # 3. Fallback: JSON-serialise everything else and store it in the
-        #    `json` field.
-        # --------------------------------------------------------------
-
         if data is not None:
             try:
-                # Prefer Arrow whenever the input looks like a dataframe.
-                data_format = determine_data_format(data)
-                if data_format != DataFormat.UNKNOWN:
-                    arrow_bytes = convert_anything_to_arrow_bytes(data)
-
-                    arrow_proto = ArrowProto()
-                    arrow_proto.data = arrow_bytes
-
-                    bidi_component_proto.arrow.CopyFrom(arrow_proto)
-                elif isinstance(data, (bytes, bytearray)):
+                # 1. Raw byte payloads - forward as-is.
+                if isinstance(data, (bytes, bytearray)):
                     bidi_component_proto.bytes = bytes(data)
-                else:
+
+                # 2. Mapping-like structures (e.g. plain dict) - use JSON to
+                #    avoid the overhead of converting to an Arrow table.
+                elif isinstance(data, Mapping):
                     bidi_component_proto.json = json.dumps(data)
+
+                # 3. Dataframe-like structures - attempt Arrow serialization.
+                else:
+                    data_format = determine_data_format(data)
+
+                    if data_format != DataFormat.UNKNOWN:
+                        arrow_bytes = convert_anything_to_arrow_bytes(data)
+
+                        arrow_proto = ArrowProto()
+                        arrow_proto.data = arrow_bytes
+
+                        bidi_component_proto.arrow.CopyFrom(arrow_proto)
+                    else:
+                        # Fallback to JSON.
+                        bidi_component_proto.json = json.dumps(data)
             except Exception:
-                # As a last resort attempt JSON serialisation so that we don't
+                # As a last resort attempt JSON serialization so that we don't
                 # silently drop developer data.
                 try:
                     bidi_component_proto.json = json.dumps(data)
