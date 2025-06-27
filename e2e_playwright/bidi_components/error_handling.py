@@ -23,10 +23,8 @@ st.header("Custom Component with incorrect JS")
 with st.echo():
 
     def incorrect_js_component() -> Any:
-        component_name = "incorrectJsComponent"
-
-        out = st.components.v2.component(
-            component_name,
+        component = st.components.v2.component(
+            "incorrectJsComponent",
             html="""<h1>The JS is incorrect</h1>""",
             js="""
                 function Foo() {
@@ -35,7 +33,7 @@ with st.echo():
             """,
         )
 
-        return out
+        return component()
 
     incorrect_js_component()
 
@@ -45,14 +43,12 @@ st.header("Custom Component with incorrect CSS path")
 with st.echo():
 
     def incorrect_css_path_component() -> Any:
-        component_name = "incorrectCssPathComponent"
-
-        out = st.components.v2.component(
-            component_name,
+        component = st.components.v2.component(
+            "incorrectCssPathComponent",
             html="""<h1>The CSS path is incorrect</h1>""",
             css=Path(__file__).parent / "incorrect_css_path.css",
         )
 
-        return out
+        return component()
 
     incorrect_css_path_component()

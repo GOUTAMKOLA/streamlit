@@ -66,6 +66,8 @@ HTML_CODE = """
 </div>
 """
 
+_my_component = st.components.v2.component("my_component", js=JS_CODE, html=HTML_CODE)
+
 
 def my_component(
     *,
@@ -74,17 +76,13 @@ def my_component(
     on_foo_change: WidgetCallback | None = None,
     on_bar_change: WidgetCallback | None = None,
 ) -> BidiComponentResult:
-    out = st.components.v2.component(
-        name="my_component",
-        js=JS_CODE,
-        html=HTML_CODE,
+    return _my_component(
         isolate_styles=True,
         key=key,
         data=data,
         on_foo_change=on_foo_change,
         on_bar_change=on_bar_change,
     )
-    return out
 
 
 if "foo_count" not in st.session_state:

@@ -41,16 +41,18 @@ with st.echo():
         css: str | Path | None = None,
         on_change: Callable[[], None] | None = None,
     ) -> BidiComponentResult:
-        out = st.components.v2.component(
+        component = st.components.v2.component(
             name="my_component",
             html=html,
             js=js,
             css=css,
-            key="my_component_1",
-            on_change=on_change,
         )
 
-        return out
+        return component(
+            key="my_component_1",
+            # TODO: Fix this to utilize the new callback API naming convention
+            on_change=on_change,
+        )
 
     if "submission_count" not in st.session_state:
         st.session_state.submission_count = 0

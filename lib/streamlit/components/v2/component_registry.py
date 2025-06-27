@@ -68,15 +68,12 @@ class BidiComponentDefinition:
         CSS content as a string, or a path to a CSS file.
     js : str, Path, or None
         JavaScript content as a string, or a path to a JS file.
-    isolate_styles : bool
-        Whether to isolate styles for the component.
     """
 
     name: str
     html: str | None = None
     css: str | Path | None = None
     js: str | Path | None = None
-    isolate_styles: bool = True
     # Store processed content and metadata
     _is_css_path: bool = field(default=False, init=False, repr=False)
     _is_js_path: bool = field(default=False, init=False, repr=False)

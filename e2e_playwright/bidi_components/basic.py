@@ -33,7 +33,7 @@ with st.echo():
     def emoji_icon(emoji: str) -> BidiComponentResult:
         component_name = "emojiIconComponent"
 
-        out = st.components.v2.component(
+        component = st.components.v2.component(
             component_name,
             html=f"""
                 <h1 class="largeIcon-{component_name}">{emoji}</h1>
@@ -50,7 +50,7 @@ with st.echo():
             """,
         )
 
-        return out
+        return component()
 
     emoji_icon("🚀")
 
@@ -68,7 +68,7 @@ with st.echo():
     def emoji_icon(emoji: str) -> BidiComponentResult:
         component_name = "emojiIconComponent2"
 
-        out = st.components.v2.component(
+        component = st.components.v2.component(
             component_name,
             html=f"""
                 <h1 class="largeIcon-{component_name}">{emoji}</h1>
@@ -95,7 +95,7 @@ with st.echo():
             """,
         )
 
-        return out
+        return component()
 
     emoji_icon("🚀")
 
@@ -160,18 +160,20 @@ div {
         on_change: WidgetCallback | None = None,
         on_click: WidgetCallback | None = None,
     ) -> BidiComponentResult:
-        out = st.components.v2.component(
+        component = st.components.v2.component(
             name="my_component",
             js=JS_CODE,
             html=HTML_CODE,
             css=CSS_CODE,
+        )
+
+        return component(
             isolate_styles=True,
             key=key,
             data=data,
             on_formValues_change=on_change,
             on_clicked_change=on_click,
         )
-        return out
 
     if "click_count" not in st.session_state:
         st.session_state.click_count = 0

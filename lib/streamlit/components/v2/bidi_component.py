@@ -222,6 +222,7 @@ class BidiComponentMixin:
         component_name: str,
         *args: Any,
         key: str | None = None,
+        isolate_styles: bool = True,
         # TODO: This needs to have a better type + support Arrow
         data: Any | None = None,
         width: Width = "stretch",
@@ -241,6 +242,9 @@ class BidiComponentMixin:
             An optional string to use as the unique key for the component.
             If this is omitted, a key will be generated based on the
             component's execution sequence.
+        isolate_styles : bool
+            Whether to sandbox the component styles in a shadow-root. Defaults to
+            True.
         **kwargs
             Keyword arguments to pass to the component.
 
@@ -322,12 +326,12 @@ class BidiComponentMixin:
         bidi_component_proto = BidiComponentProto()
         bidi_component_proto.id = computed_id
         bidi_component_proto.component_name = component_name
+        bidi_component_proto.isolate_styles = isolate_styles
         bidi_component_proto.js_content = component_def.js_content or ""
         bidi_component_proto.js_source_path = component_def.js_url or ""
         bidi_component_proto.html_content = component_def.html_content or ""
         bidi_component_proto.css_content = component_def.css_content or ""
         bidi_component_proto.css_source_path = component_def.css_url or ""
-        bidi_component_proto.isolate_styles = component_def.isolate_styles
 
         validate_width(width, allow_content=True)
         layout_config = LayoutConfig(width=width, height=height)

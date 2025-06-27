@@ -58,6 +58,8 @@ HTML_CODE = """
 </div>
 """
 
+_my_component = st.components.v2.component("my_component", js=JS_CODE, html=HTML_CODE)
+
 
 def my_component(
     *,
@@ -68,10 +70,7 @@ def my_component(
     width: Width = "stretch",
     height: Height = "content",
 ) -> BidiComponentResult:
-    out = st.components.v2.component(
-        name="my_component",
-        js=JS_CODE,
-        html=HTML_CODE,
+    out = _my_component(
         isolate_styles=True,
         key=key,
         data=data,

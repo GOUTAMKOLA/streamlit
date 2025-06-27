@@ -40,20 +40,19 @@ with st.echo():
         callback: WidgetCallback | None = None,
         key: str | None = None,
     ) -> BidiComponentResult:
-        component_name = "sliderComponent"
-
         if value is None:
             value = min
 
-        out = st.components.v2.component(
-            component_name,
+        component = st.components.v2.component(
+            "sliderComponent", js=Path(__file__).parent / "index.js"
+        )
+
+        return component(
             data={"label": label, "min": min, "max": max, "value": value},
-            js=Path(__file__).parent / "index.js",
+            # TODO: Fix this to utilize the new callback API naming convention
             on_change=callback,
             key=key,
         )
-
-        return out
 
     def handle_change():
         st.session_state["value"] = st.session_state["value"] + 1
