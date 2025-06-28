@@ -81,7 +81,9 @@ function Heading(props: HeadingProtoProps): ReactElement {
     <div className="stHeading" data-testid="stHeading">
       <StyledStreamlitMarkdown
         isCaption={Boolean(false)}
-        isInSidebarOrDialog={isInSidebar || isInDialog}
+        // isInSidebarOrDialog={isInSidebar || isInDialog}
+        isInDialog={isInDialog}
+        isInSidebar={isInSidebar}
         data-testid="stMarkdownContainer"
       >
         <HeadingWithActionElements

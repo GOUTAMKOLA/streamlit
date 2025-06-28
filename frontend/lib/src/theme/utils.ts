@@ -218,6 +218,63 @@ export const parseFontSize = (
   )
 }
 
+const convertFontSizeToRem = (
+  baseFontSize: number,
+  headerFontSize: string
+): string => {
+  // Header font sizes need to be converted to rem, but can be passed in as px or rem
+  // If px, convert to rem
+  if (headerFontSize.endsWith("px")) {
+    const pxValue = parseInt(headerFontSize)
+    const roundedPxValue = (pxValue / baseFontSize).toFixed(3)
+    return `${roundedPxValue}rem`
+  }
+  // If rem, return as is
+  return headerFontSize
+}
+
+const setHeaderFontSizes = (
+  existingFontSizes: EmotionTheme["fontSizes"],
+  h1FontSize: string,
+  inSidebar: boolean
+): EmotionTheme["fontSizes"] => {
+  const fontSizes = { ...existingFontSizes }
+  const themeSection = inSidebar ? "theme.sidebar" : "theme"
+  let convertedFontSize: string | undefined = undefined
+
+  // Check if its valid (ends with "rem" or "px") and can be parsed as a number
+  const processedH1FontSize = h1FontSize.trim().toLowerCase()
+  const parsedH1FontSize = parseFloat(processedH1FontSize)
+
+  if (
+    parsedH1FontSize &&
+    (processedH1FontSize.endsWith("rem") || processedH1FontSize.endsWith("px"))
+  ) {
+    // If valid, convert to rem
+    convertedFontSize = convertFontSizeToRem(
+      fontSizes.baseFontSize,
+      h1FontSize
+    )
+  } else if (parsedH1FontSize.toString() === processedH1FontSize) {
+    // Fallback: If h1FontSize can be parsed as a number, assume px and convert to rem
+    convertedFontSize = convertFontSizeToRem(
+      fontSizes.baseFontSize,
+      `${processedH1FontSize}px`
+    )
+  }
+
+  if (convertedFontSize) {
+    fontSizes.h1FontSize = convertedFontSize
+    return fontSizes
+  }
+
+  // If invalid, log warning and return default h1 font sizes
+  LOG.warn(
+    `Invalid size passed for h1FontSize: ${h1FontSize}. Falling back to default h1FontSize in ${themeSection}.`
+  )
+  return fontSizes
+}
+
 /**
  * Helper function to set the normal, bold, and extrabold font weights based
  * on the baseFontWeight option
@@ -287,6 +344,7 @@ export const createEmotionTheme = (
   const {
     baseFontSize,
     baseFontWeight,
+    h1FontSize,
     baseRadius,
     buttonRadius,
     codeFontSize,
@@ -479,6 +537,22 @@ export const createEmotionTheme = (
     }
     // codeFontSize default (fallback) set in typography primitives (0.875rem)
     // inlineCodeFontSize set in typography primitives (0.75em)
+  }
+
+  // TODO: Improve handling of validation/setting
+  if (notNullOrUndefined(h1FontSize)) {
+    // Handles case where h1FontSize is the only font size config set
+    if (!conditionalOverrides.fontSizes) {
+      conditionalOverrides.fontSizes = {
+        ...baseThemeConfig.emotion.fontSizes,
+      }
+    }
+
+    conditionalOverrides.fontSizes = setHeaderFontSizes(
+      conditionalOverrides.fontSizes,
+      h1FontSize,
+      inSidebar
+    )
   }
 
   if (

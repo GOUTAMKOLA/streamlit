@@ -1402,6 +1402,16 @@ _create_theme_options(
     type_=int,
 )
 
+_create_theme_options(
+    "h1FontSize",
+    categories=["theme", CustomThemeCategories.SIDEBAR],
+    description="""
+        Sets the font size (in pixels or rem) for h1 headings.
+
+        When unset, the font size will be 2.75rem.
+    """,
+)
+
 # Config Section: Secrets #
 
 _create_section("secrets", "Secrets configuration.")

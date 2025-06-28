@@ -795,7 +795,9 @@ const StreamlitMarkdown: FC<Props> = ({
   return (
     <StyledStreamlitMarkdown
       isCaption={Boolean(isCaption)}
-      isInSidebarOrDialog={isInSidebar || isInDialog}
+      // isInSidebarOrDialog={isInSidebar || isInDialog}
+      isInDialog={isInDialog}
+      isInSidebar={isInSidebar}
       isLabel={isLabel}
       inheritFont={inheritFont}
       boldLabel={boldLabel}

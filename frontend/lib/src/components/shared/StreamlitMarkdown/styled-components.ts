@@ -19,7 +19,9 @@ import styled from "@emotion/styled"
 
 export interface StyledStreamlitMarkdownProps {
   isCaption: boolean
-  isInSidebarOrDialog: boolean
+  // isInSidebarOrDialog: boolean
+  isInDialog: boolean
+  isInSidebar: boolean
   isLabel?: boolean
   inheritFont?: boolean
   boldLabel?: boolean
@@ -61,12 +63,38 @@ function convertFontSizes(
   return isCaption ? convertRemToEm(fontSize) : fontSize
 }
 
+/**
+ * Test refactored conversion of h1FontSize to rem
+ */
+function testHandleH1FontSize(
+  fontSize: string, // h1FontSize from the theme / theme.sidebar
+  isDialog: boolean,
+  isCaption: boolean
+): string {
+  // Dialogs use a scaled down h1FontSize
+  if (isDialog) {
+    const remValue = parseFloat(fontSize) * 0.55
+    const dialogFontSize = Math.round(remValue * 8) / 8 // Round to nearest 8th
+    return isCaption
+      ? convertRemToEm(`${dialogFontSize}rem`)
+      : `${dialogFontSize}rem`
+  }
+
+  // For headers in `st.caption`, we use `em` values, so the headers automatically
+  // become a bit smaller by adapting to the font size of the caption.
+  return isCaption ? convertRemToEm(fontSize) : fontSize
+}
+
 function getMarkdownHeadingDefinitions(
   theme: Theme,
-  useSmallerHeadings: boolean,
+  // useSmallerHeadings: boolean,
+  // TESTING:
+  isInSidebar: boolean,
+  isDialog: boolean,
   isCaption: boolean
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TODO: Replace 'any' with a more specific type.
 ): any {
+  const useSmallerHeadings = isDialog || isInSidebar
   return {
     "h1, h2, h3, h4, h5, h6": {
       fontFamily: theme.genericFonts.headingFont,
@@ -77,12 +105,13 @@ function getMarkdownHeadingDefinitions(
       color: "inherit",
     },
     h1: {
-      fontSize: convertFontSizes(
-        theme.fontSizes.fourXL,
-        theme.fontSizes.xl,
-        useSmallerHeadings,
+      // TESTING:
+      fontSize: testHandleH1FontSize(
+        theme.fontSizes.h1FontSize,
+        isDialog,
         isCaption
       ),
+
       fontWeight: useSmallerHeadings
         ? theme.fontWeights.headerBold
         : theme.fontWeights.headerExtraBold,
@@ -147,7 +176,9 @@ export const StyledStreamlitMarkdown =
     ({
       theme,
       isCaption,
-      isInSidebarOrDialog,
+      // isInSidebarOrDialog,
+      isInDialog,
+      isInSidebar,
       isLabel,
       inheritFont,
       boldLabel,
@@ -172,7 +203,9 @@ export const StyledStreamlitMarkdown =
         ...sharedMarkdownStyle(theme),
         ...getMarkdownHeadingDefinitions(
           theme,
-          isInSidebarOrDialog,
+          // isInSidebarOrDialog,
+          isInSidebar,
+          isInDialog,
           isCaption
         ),
 

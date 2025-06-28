@@ -29,6 +29,34 @@ import { CustomThemeConfig } from "@streamlit/protobuf"
 
 import Sidebar, { SidebarProps } from "./Sidebar"
 
+const getH1FontSize = (
+  themeConfig: Partial<CustomThemeConfig> = {},
+  baseFontSize: number = 16
+): string => {
+  // Header font size set in the following priority:
+  // 1. If theme.sidebar.h1FontSize is set, use it
+  // 2. If theme.h1FontSize is set, use a scaled down version of it for sidebar
+  // 3. If neither set, use the default sidebar h1FontSize (1.5rem)
+  if (themeConfig.sidebar?.h1FontSize) {
+    return themeConfig.sidebar.h1FontSize
+  } else if (themeConfig.h1FontSize) {
+    // Scale down the h1FontSize for sidebar by 45%
+    if (themeConfig.h1FontSize.endsWith("px")) {
+      // Handle px case:
+      const remValue = (parseInt(themeConfig.h1FontSize) / baseFontSize) * 0.55
+      const roundedRemValue = Math.round(remValue * 8) / 8 // Round to nearest 8th
+      return `${roundedRemValue}rem`
+    } else if (themeConfig.h1FontSize.endsWith("rem")) {
+      // Handle rem case:
+      const remValue = parseFloat(themeConfig.h1FontSize) * 0.55
+      const roundedRemValue = Math.round(remValue * 8) / 8 // Round to nearest 8th
+      return `${roundedRemValue}rem`
+    }
+  }
+
+  return "1.5rem"
+}
+
 export const createSidebarTheme = (theme: ThemeConfig): ThemeConfig => {
   let sidebarOverride = {}
   if (notNullOrUndefined(theme.themeInput?.sidebar)) {
@@ -45,11 +73,15 @@ export const createSidebarTheme = (theme: ThemeConfig): ThemeConfig => {
     theme.themeInput?.sidebar?.secondaryBackgroundColor ||
     theme.emotion.colors.bgColor
 
+  // TESTING:
+  const h1FontSize = getH1FontSize(theme.themeInput)
+
   // Override the background and secondary background colors in sidebar overwrites:
   sidebarOverride = {
     ...sidebarOverride,
     backgroundColor: sidebarBackground,
     secondaryBackgroundColor: secondaryBackgroundColor,
+    h1FontSize,
   }
 
   const baseTheme =

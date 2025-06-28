@@ -45,6 +45,9 @@ export const fontSizes = {
   // Inline code font size as em value for proper scaling w/ headers, captions,
   // sidebar, etc.
   inlineCodeFontSize: "0.75em",
+
+  // TESTING:
+  h1FontSize: "2.75rem",
 }
 
 export const fontWeights = {
