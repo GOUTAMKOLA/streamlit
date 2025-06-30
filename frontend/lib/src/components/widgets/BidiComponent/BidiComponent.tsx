@@ -46,6 +46,7 @@ import type {
   ComponentResult,
   StV2ComponentArgs,
 } from "./types"
+import { ThemeCssProvider } from "./ThemeCssProvider"
 
 //#region Utility functions
 const LOG = getLogger("BidiComponent")
@@ -549,7 +550,9 @@ const BidiComponent: FC<BidiComponentProps> = ({
 
   return (
     <BidiComponentContext.Provider value={contextValue}>
-      {isolateStyles ? <IsolatedComponent /> : <NonIsolatedComponent />}
+      <ThemeCssProvider>
+        {isolateStyles ? <IsolatedComponent /> : <NonIsolatedComponent />}
+      </ThemeCssProvider>
     </BidiComponentContext.Provider>
   )
 }

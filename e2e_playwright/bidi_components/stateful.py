@@ -58,7 +58,18 @@ HTML_CODE = """
 </div>
 """
 
-_my_component = st.components.v2.component("my_component", js=JS_CODE, html=HTML_CODE)
+CSS_CODE = """
+label {
+  color: var(--st-colors-primary);
+}
+"""
+
+_my_component = st.components.v2.component(
+    "my_component",
+    js=JS_CODE,
+    html=HTML_CODE,
+    css=CSS_CODE,
+)
 
 
 def my_component(
