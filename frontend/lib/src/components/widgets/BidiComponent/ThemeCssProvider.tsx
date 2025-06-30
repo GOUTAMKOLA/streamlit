@@ -21,11 +21,13 @@ import kebabCase from "lodash/kebabCase"
 
 import { useEmotionTheme } from "~lib/hooks/useEmotionTheme"
 
+import { StyledThemeCssProvider } from "./styled-components"
+
 /**
  * Recursively converts a nested object to CSS custom properties
  * with the --st- prefix and kebab-case naming
  */
-const objectToCssCustomProperties = (
+export const objectToCssCustomProperties = (
   obj: Record<string, unknown>,
   prefix = "--st"
 ): CSSProperties => {
@@ -60,9 +62,13 @@ const objectToCssCustomProperties = (
 export const ThemeCssProvider: FC<PropsWithChildren> = ({ children }) => {
   const theme = useEmotionTheme()
 
-  const styles = useMemo(() => {
+  const cssCustomProperties = useMemo(() => {
     return objectToCssCustomProperties(theme)
   }, [theme])
 
-  return <div style={styles}>{children}</div>
+  return (
+    <StyledThemeCssProvider cssCustomProperties={cssCustomProperties}>
+      {children}
+    </StyledThemeCssProvider>
+  )
 }

@@ -14,71 +14,126 @@
  * limitations under the License.
  */
 
+import { describe, expect, it } from "vitest"
 import { render } from "@testing-library/react"
-import { describe, expect, it, vi } from "vitest"
 
-import { ThemeCssProvider } from "./ThemeCssProvider"
+import {
+  objectToCssCustomProperties,
+  ThemeCssProvider,
+} from "./ThemeCssProvider"
 
-// Mock the useEmotionTheme hook
-vi.mock("~lib/hooks/useEmotionTheme", () => ({
-  useEmotionTheme: vi.fn(() => ({
-    colors: {
+describe("objectToCssCustomProperties", () => {
+  it("should convert flat object to CSS custom properties", () => {
+    const input = {
       primary: "#ff0000",
       secondary: "#00ff00",
-      bgColor: "#ffffff",
-      bodyText: "#000000",
-    },
-    fontSizes: {
-      sm: "0.875rem",
-      md: "1rem",
-      lg: "1.25rem",
-      baseFontSize: 16,
-    },
-    spacing: {
-      sm: "0.5rem",
-      md: "0.75rem",
-      lg: "1rem",
-    },
-    inSidebar: false,
-    showSidebarBorder: true,
-  })),
-}))
+      inSidebar: false,
+      fontSize: 16,
+    }
 
-describe("ThemeCssProvider", () => {
-  it("should generate CSS custom properties from theme object", () => {
-    const { container } = render(
-      <ThemeCssProvider>
-        <div data-testid="child">Child content</div>
-      </ThemeCssProvider>
-    )
+    const result = objectToCssCustomProperties(input)
 
-    const providerElement = container.firstChild as HTMLElement
-    const styles = providerElement.style
-
-    // Test nested object conversion (colors)
-    expect(styles.getPropertyValue("--st-colors-primary")).toBe("#ff0000")
-    expect(styles.getPropertyValue("--st-colors-secondary")).toBe("#00ff00")
-    expect(styles.getPropertyValue("--st-colors-bg-color")).toBe("#ffffff")
-    expect(styles.getPropertyValue("--st-colors-body-text")).toBe("#000000")
-
-    // Test nested object conversion (fontSizes with camelCase)
-    expect(styles.getPropertyValue("--st-font-sizes-sm")).toBe("0.875rem")
-    expect(styles.getPropertyValue("--st-font-sizes-md")).toBe("1rem")
-    expect(styles.getPropertyValue("--st-font-sizes-lg")).toBe("1.25rem")
-    expect(styles.getPropertyValue("--st-font-sizes-base-font-size")).toBe(
-      "16"
-    )
-
-    // Test nested object conversion (spacing)
-    expect(styles.getPropertyValue("--st-spacing-sm")).toBe("0.5rem")
-    expect(styles.getPropertyValue("--st-spacing-md")).toBe("0.75rem")
-    expect(styles.getPropertyValue("--st-spacing-lg")).toBe("1rem")
-
-    // Test boolean conversion
-    expect(styles.getPropertyValue("--st-in-sidebar")).toBe("false")
-    expect(styles.getPropertyValue("--st-show-sidebar-border")).toBe("true")
+    expect(result).toEqual({
+      "--st-primary": "#ff0000",
+      "--st-secondary": "#00ff00",
+      "--st-in-sidebar": "false",
+      "--st-font-size": "16",
+    })
   })
 
+  it("should convert nested object to CSS custom properties with proper kebab-case naming", () => {
+    const input = {
+      colors: {
+        primary: "#ff0000",
+        secondary: "#00ff00",
+        bgColor: "#ffffff",
+        bodyText: "#000000",
+      },
+      fontSizes: {
+        sm: "0.875rem",
+        md: "1rem",
+        lg: "1.25rem",
+        baseFontSize: 16,
+      },
+      spacing: {
+        sm: "0.5rem",
+        md: "0.75rem",
+        lg: "1rem",
+      },
+    }
+
+    const result = objectToCssCustomProperties(input)
+
+    expect(result).toEqual({
+      // colors
+      "--st-colors-primary": "#ff0000",
+      "--st-colors-secondary": "#00ff00",
+      "--st-colors-bg-color": "#ffffff",
+      "--st-colors-body-text": "#000000",
+      // fontSizes
+      "--st-font-sizes-sm": "0.875rem",
+      "--st-font-sizes-md": "1rem",
+      "--st-font-sizes-lg": "1.25rem",
+      "--st-font-sizes-base-font-size": "16",
+      // spacing
+      "--st-spacing-sm": "0.5rem",
+      "--st-spacing-md": "0.75rem",
+      "--st-spacing-lg": "1rem",
+    })
+  })
+
+  it("should handle deeply nested objects", () => {
+    const input = {
+      theme: {
+        colors: {
+          palette: {
+            primary: "#ff0000",
+          },
+        },
+      },
+    }
+
+    const result = objectToCssCustomProperties(input)
+
+    expect(result).toEqual({
+      "--st-theme-colors-palette-primary": "#ff0000",
+    })
+  })
+
+  it("should convert boolean and number values to strings", () => {
+    const input = {
+      isEnabled: true,
+      isDisabled: false,
+      count: 42,
+      ratio: 1.5,
+    }
+
+    const result = objectToCssCustomProperties(input)
+
+    expect(result).toEqual({
+      "--st-is-enabled": "true",
+      "--st-is-disabled": "false",
+      "--st-count": "42",
+      "--st-ratio": "1.5",
+    })
+  })
+
+  it("should use custom prefix when provided", () => {
+    const input = {
+      primary: "#ff0000",
+      secondary: "#00ff00",
+    }
+
+    const result = objectToCssCustomProperties(input, "--custom")
+
+    expect(result).toEqual({
+      "--custom-primary": "#ff0000",
+      "--custom-secondary": "#00ff00",
+    })
+  })
+})
+
+describe("ThemeCssProvider", () => {
   it("should render children correctly", () => {
     const { getByTestId } = render(
       <ThemeCssProvider>
