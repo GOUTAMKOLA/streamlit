@@ -38,7 +38,7 @@ import { DynamicIcon } from "~lib/components/shared/Icon"
 import TooltipIcon from "~lib/components/shared/TooltipIcon"
 import { Placement } from "~lib/components/shared/Tooltip"
 import { isInForm, labelVisibilityProtoValueToEnum } from "~lib/util/utils"
-import { useCalculatedWidth } from "~lib/hooks/useCalculatedWidth"
+import { useCalculatedDimensions } from "~lib/hooks/useCalculatedDimensions"
 import { useEmotionTheme } from "~lib/hooks/useEmotionTheme"
 
 import { StyledTextInput } from "./styled-components"
@@ -64,7 +64,7 @@ function TextInput({
     () => getStateFromWidgetMgr(widgetMgr, element) ?? null
   )
 
-  const [width, elementRef] = useCalculatedWidth()
+  const [width, _, elementRef] = useCalculatedDimensions()
 
   /**
    * True if the user-specified state.value has not yet been synced to the WidgetStateManager.

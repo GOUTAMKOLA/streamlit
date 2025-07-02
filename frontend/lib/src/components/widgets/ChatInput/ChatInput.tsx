@@ -54,7 +54,7 @@ import {
 import { FileUploadClient } from "~lib/FileUploadClient"
 import { getAccept } from "~lib/components/widgets/FileUploader/utils"
 import { FileSize, sizeConverter } from "~lib/util/FileHelper"
-import { useCalculatedWidth } from "~lib/hooks/useCalculatedWidth"
+import { useCalculatedDimensions } from "~lib/hooks/useCalculatedDimensions"
 import { useEmotionTheme } from "~lib/hooks/useEmotionTheme"
 
 import {
@@ -111,7 +111,7 @@ function ChatInput({
   const counterRef = useRef(0)
   const heightGuidance = useRef({ minHeight: 0, maxHeight: 0 })
 
-  const [width, elementRef] = useCalculatedWidth()
+  const [width, _, elementRef] = useCalculatedDimensions()
 
   // The value specified by the user via the UI. If the user didn't touch this widget's UI, the default value is used.
   const [value, setValue] = useState(element.default)

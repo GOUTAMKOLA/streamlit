@@ -25,7 +25,7 @@ import Toolbar, {
 import { ElementFullscreenContext } from "~lib/components/shared/ElementFullscreen/ElementFullscreenContext"
 import { useRequiredContext } from "~lib/hooks/useRequiredContext"
 import { withFullScreenWrapper } from "~lib/components/shared/FullScreenWrapper"
-import { useCalculatedWidth } from "~lib/hooks/useCalculatedWidth"
+import { useCalculatedDimensions } from "~lib/hooks/useCalculatedDimensions"
 
 import { VegaLiteChartElement } from "./arrowUtils"
 import {
@@ -34,12 +34,15 @@ import {
 } from "./styled-components"
 import { useVegaElementPreprocessor } from "./useVegaElementPreprocessor"
 import { useVegaEmbed } from "./useVegaEmbed"
+import { streamlit } from "@streamlit/protobuf"
 
 export interface Props {
   element: VegaLiteChartElement
   widgetMgr: WidgetStateManager
   fragmentId?: string
   disableFullscreenMode?: boolean
+  widthConfig: streamlit.IWidthConfig
+  heightConfig: streamlit.IHeightConfig
 }
 
 const ArrowVegaLiteChart: FC<Props> = ({
@@ -47,14 +50,29 @@ const ArrowVegaLiteChart: FC<Props> = ({
   element: inputElement,
   fragmentId,
   widgetMgr,
+  widthConfig,
+  heightConfig,
 }) => {
   const {
     expanded: isFullScreen,
-    height,
     expand,
     collapse,
   } = useRequiredContext(ElementFullscreenContext)
-  const [width, containerRef] = useCalculatedWidth()
+
+  // When we are in full screen mode, this will be the
+  // width/height of the screen based on the expansion
+  // of the parent StyledFullScreenFrame.
+  // Otherwise, it will be according to the user's settings
+  // determined by styling on the StyledElementContainer.
+  const [containerWidth, containerHeight, containerRef] =
+    useCalculatedDimensions()
+
+  const useContainerWidth = !!(
+    widthConfig?.useStretch || widthConfig?.pixelWidth
+  )
+  const useContainerHeight = !!(
+    heightConfig?.useStretch || heightConfig?.pixelHeight
+  )
 
   // We preprocess the input vega element to do a two things:
   // 1. Update the spec to handle Streamlit specific configurations such as
@@ -64,9 +82,10 @@ const ArrowVegaLiteChart: FC<Props> = ({
   //    Note: We do not stabilize data/datasets as that is managed by the embed.
   const element = useVegaElementPreprocessor(
     inputElement,
-    isFullScreen,
-    width,
-    height ?? 0
+    containerWidth,
+    containerHeight,
+    useContainerWidth,
+    useContainerHeight
   )
 
   // This hook provides lifecycle functions for creating and removing the view.
@@ -84,13 +103,21 @@ const ArrowVegaLiteChart: FC<Props> = ({
   // We utilize useLayoutEffect to ensure that the view is created
   // after the container is mounted to avoid layout shift.
   useLayoutEffect(() => {
+    // TODO(lawilby): Can we just update the view if the width/height changes?
     if (containerRef.current !== null) {
       // eslint-disable-next-line @typescript-eslint/no-floating-promises -- TODO: Fix this
       createView(containerRef, spec)
     }
 
     return finalizeView
-  }, [createView, finalizeView, spec, width, height, containerRef])
+  }, [
+    createView,
+    finalizeView,
+    spec,
+    containerWidth,
+    containerHeight,
+    containerRef,
+  ])
 
   // The references to data and datasets will always change each rerun
   // because the forward message always produces new references, so
@@ -104,10 +131,7 @@ const ArrowVegaLiteChart: FC<Props> = ({
   // To style the Vega tooltip, we need to apply global styles since
   // the tooltip element is drawn outside of this component.
   return (
-    <StyledToolbarElementContainer
-      height={height}
-      useContainerWidth={element.useContainerWidth}
-    >
+    <StyledToolbarElementContainer>
       <Toolbar
         target={StyledToolbarElementContainer}
         isFullScreen={isFullScreen}

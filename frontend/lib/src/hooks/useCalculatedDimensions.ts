@@ -34,7 +34,7 @@ import { useResizeObserver } from "./useResizeObserver"
  * @example
  * ```tsx
  * const MyComponent = () => {
- *   const [width, ref] = useCalculatedWidth();
+ *   const [width, ref] = useCalculatedDimensions();
  *
  *   return (
  *     <div ref={ref}>
@@ -44,14 +44,15 @@ import { useResizeObserver } from "./useResizeObserver"
  * };
  * ```
  */
-export const useCalculatedWidth = <T extends HTMLDivElement>(): [
+export const useCalculatedDimensions = <T extends HTMLDivElement>(): [
+  number,
   number,
   MutableRefObject<T | null>,
 ] => {
   const {
-    values: [width],
+    values: [width, height],
     elementRef,
-  } = useResizeObserver<T>(useMemo(() => ["width"], []))
+  } = useResizeObserver<T>(useMemo(() => ["width", "height"], []))
 
-  return [width || -1, elementRef]
+  return [width || -1, height || -1, elementRef]
 }

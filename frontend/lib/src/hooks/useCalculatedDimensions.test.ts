@@ -17,9 +17,9 @@
 import { renderHook } from "@testing-library/react"
 
 import * as useResizeObserver from "./useResizeObserver"
-import { useCalculatedWidth } from "./useCalculatedWidth"
+import { useCalculatedDimensions } from "./useCalculatedDimensions"
 
-describe("useCalculatedWidth", () => {
+describe("useCalculatedDimensions", () => {
   afterEach(() => {
     vi.clearAllMocks()
     vi.restoreAllMocks()
@@ -42,7 +42,7 @@ describe("useCalculatedWidth", () => {
         })
       )
 
-      const { result } = renderHook(() => useCalculatedWidth())
+      const { result } = renderHook(() => useCalculatedDimensions())
       expect(result.current[0]).toBe(expected)
     }
   )

@@ -32,7 +32,7 @@ import BaseButton, {
 } from "~lib/components/shared/BaseButton"
 import IsSidebarContext from "~lib/components/core/IsSidebarContext"
 import { Box } from "~lib/components/shared/Base/styled-components"
-import { useCalculatedWidth } from "~lib/hooks/useCalculatedWidth"
+import { useCalculatedDimensions } from "~lib/hooks/useCalculatedDimensions"
 
 import { StyledPopoverButtonIcon } from "./styled-components"
 
@@ -52,7 +52,7 @@ const Popover: React.FC<React.PropsWithChildren<PopoverProps>> = ({
   const theme = useEmotionTheme()
   const lightBackground = hasLightBackgroundColor(theme)
 
-  const [width, elementRef] = useCalculatedWidth()
+  const [width, _, elementRef] = useCalculatedDimensions()
 
   return (
     <Box data-testid="stPopover" className="stPopover" ref={elementRef}>

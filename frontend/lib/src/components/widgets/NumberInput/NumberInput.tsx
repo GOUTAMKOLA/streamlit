@@ -47,7 +47,7 @@ import {
 } from "~lib/components/widgets/BaseWidget"
 import { convertRemToPx } from "~lib/theme"
 import { useEmotionTheme } from "~lib/hooks/useEmotionTheme"
-import { useCalculatedWidth } from "~lib/hooks/useCalculatedWidth"
+import { useCalculatedDimensions } from "~lib/hooks/useCalculatedDimensions"
 
 import {
   canDecrement,
@@ -89,7 +89,7 @@ const NumberInput: React.FC<Props> = ({
     max,
   } = element
 
-  const [width, elementRef] = useCalculatedWidth()
+  const [width, _, elementRef] = useCalculatedDimensions()
 
   const [step, setStep] = useState<number>(() => getStep(element))
   const initialValue = getInitialValue({ element, widgetMgr })
