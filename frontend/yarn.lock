@@ -10513,7 +10513,7 @@ __metadata:
     "@typescript-eslint/types": "npm:^8.0.0"
     "@typescript-eslint/utils": "npm:^8.0.0"
     "@vitest/coverage-v8": "npm:^3.2.4"
-    eslint: "npm:^9.0.0"
+    eslint: "npm:^9.30.1"
     typescript: "npm:^5.0.0"
     vite: "npm:^6.0.0"
     vite-plugin-dts: "npm:^4.0.0"
@@ -10567,7 +10567,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"eslint@npm:^9.0.0, eslint@npm:^9.30.1":
+"eslint@npm:^9.30.1":
   version: 9.30.1
   resolution: "eslint@npm:9.30.1"
   dependencies:
