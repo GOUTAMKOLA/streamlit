@@ -14,14 +14,10 @@
  * limitations under the License.
  */
 
-const useStrictNullEqualityChecks = require("./use-strict-null-equality-checks")
-const noHardcodedThemeValues = require("./no-hardcoded-theme-values")
-const enforceMemo = require("./enforce-memo")
+import { ESLintUtils } from "@typescript-eslint/utils"
 
-module.exports = {
-  rules: {
-    "use-strict-null-equality-checks": useStrictNullEqualityChecks,
-    "no-hardcoded-theme-values": noHardcodedThemeValues,
-    "enforce-memo": enforceMemo,
-  },
-}
+// Create a rule creator for our custom ESLint rules
+export const createRule = ESLintUtils.RuleCreator(
+  name =>
+    `https://github.com/streamlit/streamlit/blob/develop/frontend/eslint-plugin-streamlit-custom/src/${name}.ts`
+)
