@@ -54,6 +54,7 @@ class LayoutsMixin:
         height: int | None = None,
         border: bool | None = None,
         key: Key | None = None,
+        direction: Literal["horizontal", "vertical"] = "vertical",
     ) -> DeltaGenerator:
         """Insert a multi-element container.
 
@@ -159,6 +160,11 @@ class LayoutsMixin:
         block_proto.allow_empty = False
         block_proto.flex_container.border = border or False
         block_proto.flex_container.wrap = False
+        block_proto.flex_container.direction = (
+            BlockProto.FlexContainer.Direction.VERTICAL
+            if direction == "vertical"
+            else BlockProto.FlexContainer.Direction.HORIZONTAL
+        )
 
         if isinstance(height, int) or border:
             block_proto.allow_empty = True
